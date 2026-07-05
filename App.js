@@ -1,20 +1,158 @@
+import React from 'react';
+import { View, Text, ActivityIndicator } from 'react-native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-export default function App() {
+import { AppProvider, useApp } from './src/state/AppContext';
+import { colors } from './src/theme';
+import { t } from './src/i18n/strings';
+
+import AuthScreen from './src/screens/AuthScreen';
+import VerifyEmailScreen from './src/screens/VerifyEmailScreen';
+import AnonymousScreen from './src/screens/AnonymousScreen';
+import FeedScreen from './src/screens/FeedScreen';
+import CreatePostScreen from './src/screens/CreatePostScreen';
+import CreateStoryScreen from './src/screens/CreateStoryScreen';
+import StoryViewerScreen from './src/screens/StoryViewerScreen';
+import DiscoverScreen from './src/screens/DiscoverScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import MyAccountScreen from './src/screens/MyAccountScreen';
+import PublicProfileScreen from './src/screens/PublicProfileScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
+import MyEducationScreen from './src/screens/MyEducationScreen';
+import CommentsScreen from './src/screens/CommentsScreen';
+import UserProfileScreen from './src/screens/UserProfileScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
+import { ChatListScreen, ChatRoomScreen } from './src/screens/ChatScreens';
+import {
+  CampusHubScreen, SpotlightScreen, EducationScreen, JobsScreen,
+} from './src/screens/CampusScreens';
+import {
+  EventsScreen, LostFoundScreen, AlumniScreen, ClubsScreen, SeminarsScreen,
+} from './src/screens/CampusExtraScreens';
+
+const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+const TAB_ICONS = {
+  Feed: 'home',
+  Discover: 'compass',
+  Chats: 'chatbubbles',
+  Campus: 'school',
+  Profile: 'person-circle',
+};
+
+function Tabs() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.inkSoft,
+        tabBarStyle: { borderTopColor: colors.line, backgroundColor: colors.surface },
+        tabBarIcon: ({ color, focused, size }) => (
+          <Ionicons
+            name={focused ? TAB_ICONS[route.name] : `${TAB_ICONS[route.name]}-outline`}
+            size={size}
+            color={color}
+          />
+        ),
+      })}
+    >
+      <Tab.Screen name="Feed" component={FeedScreen} options={{ tabBarLabel: t('feed') }} />
+      <Tab.Screen name="Discover" component={DiscoverScreen} options={{ tabBarLabel: t('discover') }} />
+      <Tab.Screen name="Chats" component={ChatListScreen} options={{ tabBarLabel: t('chats') }} />
+      <Tab.Screen name="Campus" component={CampusHubScreen} options={{ tabBarLabel: t('campus') }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: t('profile') }} />
+    </Tab.Navigator>
+  );
+}
+
+function Root() {
+  const { user, booting } = useApp();
+  if (booting) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
+  if (!user) return <AuthScreen />;
+  if (user.emailVerified === false) return <VerifyEmailScreen />;
+  return (
+    <View style={{ flex: 1 }}>
+      {user.anon?.on && (
+        <View style={{
+          backgroundColor: colors.anon,
+          paddingTop: 34, paddingBottom: 6,
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>
+            {user.anon.emoji || '🎭'}  ANONYMOUS — appearing as {user.anon.name || 'Anonymous'}
+          </Text>
+        </View>
+      )}
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Tabs" component={Tabs} />
+      <Stack.Screen name="CreatePost" component={CreatePostScreen} options={{ presentation: 'modal' }} />
+      <Stack.Screen name="CreateStory" component={CreateStoryScreen} options={{ presentation: 'modal' }} />
+      <Stack.Screen name="StoryViewer" component={StoryViewerScreen} options={{ presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="ChatRoom" component={ChatRoomScreen} />
+      <Stack.Screen name="Comments" component={CommentsScreen} />
+      <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="MyAccount" component={MyAccountScreen} />
+      <Stack.Screen name="PublicProfile" component={PublicProfileScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="AnonMode" component={AnonymousScreen} />
+      <Stack.Screen name="MyEducation" component={MyEducationScreen} />
+      <Stack.Screen name="Events" component={EventsScreen} />
+      <Stack.Screen name="Clubs" component={ClubsScreen} />
+      <Stack.Screen name="Seminars" component={SeminarsScreen} />
+      <Stack.Screen name="LostFound" component={LostFoundScreen} />
+      <Stack.Screen name="Alumni" component={AlumniScreen} />
+      <Stack.Screen name="Spotlight" component={SpotlightScreen} />
+      <Stack.Screen name="Education" component={EducationScreen} />
+      <Stack.Screen name="Jobs" component={JobsScreen} />
+    </Stack.Navigator>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+// Consumes uiTick so a theme/language change re-renders navigation,
+// tab labels, background and status bar instantly.
+function ThemedApp() {
+  const { uiTick } = useApp();
+  const navTheme = {
+    ...DefaultTheme,
+    dark: !!colors.dark,
+    colors: {
+      ...DefaultTheme.colors,
+      background: colors.bg,
+      card: colors.surface,
+      text: colors.ink,
+      border: colors.line,
+      primary: colors.primary,
+    },
+  };
+  return (
+    <NavigationContainer theme={navTheme} key={`nav`}>
+      <StatusBar style={colors.dark ? 'light' : 'dark'} />
+      <Root />
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppProvider>
+        <ThemedApp />
+      </AppProvider>
+    </SafeAreaProvider>
+  );
+}

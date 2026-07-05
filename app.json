@@ -1,24 +1,55 @@
 {
   "expo": {
-    "name": "utopia",
+    "name": "Utopia",
     "slug": "utopia",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#067D5A"
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      "package": "com.yourname.utopia",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "bundler": "metro"
+    },
+    "plugins": [
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Utopia uses your location to show friends near you on campus."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Utopia needs photo access so you can share posts.",
+          "cameraPermission": "Utopia needs camera access so you can share posts."
+        }
+      ],
+      "@react-native-google-signin/google-signin",
+      "expo-audio",
+      "expo-sharing"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1c10fc29-22e7-4807-b071-9e106cad204b"
+      }
     }
   }
 }
