@@ -380,8 +380,11 @@ export function ChatRoomScreen({ route, navigation }) {
   // Anonymous mode ON + starting a chat by person -> use a separate anonymous
   // chat thread; opening from the chat list (explicit chatId) is unchanged.
   const baseId = params.otherId ? chatIdFor(user.id, params.otherId) : null;
+  // A chat is anonymous if: I'm messaging someone's anon identity (toAnon),
+  // OR my own anon mode is on when starting the chat.
+  const startAnon = !!params.toAnon || !!user.anon?.on;
   const chatId = params.chatId ||
-    (user.anon?.on ? `${baseId}_anon_${user.id}` : baseId);
+    (startAnon ? `${baseId}_anon_${user.id}` : baseId);
 
   const [meta, setMeta] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -413,6 +416,11 @@ export function ChatRoomScreen({ route, navigation }) {
   const myDisplayName = iAmAnonHere ? (user.anon?.name || 'Anonymous') : user.name;
   const theyAreAnon = anonChat && meta?.anonFor && meta.anonFor === otherId;
   const blocked = !isGroup && otherId ? isBlockedEither(otherId) : false;
+  // Friends-only rule: for a REAL (non-anonymous) 1:1 chat, you can only
+  // message accepted friends. Anonymous chats and group chats are exempt —
+  // in anonymous mode anyone can message anyone.
+  const notFriendYet = !isGroup && !anonChat && otherId &&
+    !(user.friends || []).includes(otherId);
   // presence stays hidden in anonymous chats (it would leak identity)
   const pres = !isGroup && !anonChat && otherId ? presenceOf(otherId) : null;
 
@@ -846,6 +854,19 @@ export function ChatRoomScreen({ route, navigation }) {
         <View style={[styles.inputBar, { justifyContent: 'center' }]}>
           <Ionicons name="ban" size={16} color={colors.inkSoft} />
           <Text style={type.caption}>You can't message this person.</Text>
+        </View>
+      ) : notFriendYet ? (
+        <View style={[styles.inputBar, { justifyContent: 'center', gap: 8 }]}>
+          <Ionicons name="people-outline" size={16} color={colors.inkSoft} />
+          <Text style={[type.caption, { flex: 1 }]}>
+            You can only message friends. Send a friend request first.
+          </Text>
+          <TouchableOpacity
+            style={[styles.send, { width: 'auto', paddingHorizontal: 14, borderRadius: 999 }]}
+            onPress={() => navigation.navigate('UserProfile', { userId: otherId, name: title })}
+          >
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12.5 }}>Add friend</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

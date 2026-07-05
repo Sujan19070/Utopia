@@ -12,6 +12,7 @@ import { SearchPickerModal, SelectField } from '../components/pickers';
 import { useApp } from '../state/AppContext';
 import { UNIVERSITIES } from '../data/universities';
 import { COLLEGES } from '../data/colleges';
+import { MEDICAL_COLLEGES } from '../data/medicalColleges';
 
 export const INTERESTS = [
   'Programming', 'Robotics', 'Machine Learning', 'Power', 'Literature', 'Art',
@@ -45,7 +46,7 @@ export default function MyEducationScreen({ navigation }) {
 
   // Is the currently picked role already verified for this account?
   const roleActive = user.roleVerified && user.role === f.role;
-  const needsVerify = f.role !== 'student' && !roleActive;
+  const needsVerify = !roleActive;
 
   const sendVerify = async () => {
     setVMsg('');
@@ -85,9 +86,11 @@ export default function MyEducationScreen({ navigation }) {
     setMsg('');
     try {
       await saveEducation(f);
-      setMsg(needsVerify
+      setMsg(needsVerify && f.role !== 'student'
         ? 'Saved. Your role stays as before until you verify the email above.'
-        : t('saved'));
+        : needsVerify
+          ? 'Saved as Student. Verify your .edu email above to get the verified badge.'
+          : t('saved'));
     } catch (e) {
       setMsg(String(e?.message || e));
     } finally {
@@ -126,32 +129,35 @@ export default function MyEducationScreen({ navigation }) {
             })}
           </View>
 
-          {f.role !== 'student' && (
-            <View style={styles.verifyBox}>
+          <View style={styles.verifyBox}>
               {roleActive ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Ionicons name="shield-checkmark" size={20} color={colors.primary} />
                   <Text style={{ ...type.body, fontWeight: '800', color: colors.primaryDark }}>
-                    {f.role === 'teacher' ? 'Teacher' : 'Alumni'} verified
+                    {f.role === 'teacher' ? 'Teacher' : f.role === 'alumni' ? 'Alumni' : 'Student'} verified
                     {user.eduEmail ? ` · ${user.eduEmail}` : ''}
                   </Text>
                 </View>
               ) : (
                 <>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.sm }}>
-                    <Ionicons name="lock-closed" size={16} color={colors.accent} />
+                    <Ionicons name="ribbon-outline" size={16} color={colors.accent} />
                     <Text style={{ ...type.body, fontWeight: '800' }}>
-                      Verify to become {f.role === 'teacher' ? 'a Teacher' : 'an Alumnus'}
+                      {f.role === 'teacher' ? 'Verify to become a Teacher'
+                        : f.role === 'alumni' ? 'Verify to become an Alumnus'
+                        : 'Get the verified Student badge'}
                     </Text>
                   </View>
                   <Text style={[type.caption, { marginBottom: spacing.sm }]}>
                     {f.role === 'teacher'
                       ? 'Confirm your university / institutional email so students can trust the Teacher badge.'
-                      : 'Confirm an email to verify you graduated. Your university email is best.'}
+                      : f.role === 'alumni'
+                        ? 'Confirm an email to verify you graduated. Your university email is best.'
+                        : 'Confirm your student (.edu / university) email to get a verified Student badge on your posts and profile. Optional — you can use Utopia as a student without it.'}
                   </Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="you@university.edu.bd"
+                    placeholder="you@student.university.edu.bd"
                     placeholderTextColor={colors.inkSoft}
                     value={eduEmail}
                     onChangeText={setEduEmail}
@@ -188,7 +194,6 @@ export default function MyEducationScreen({ navigation }) {
                 </>
               )}
             </View>
-          )}
 
           <SelectField
             label="University"
@@ -274,7 +279,7 @@ export default function MyEducationScreen({ navigation }) {
       <SearchPickerModal
         visible={picker === 'university'}
         title="Select your university"
-        items={UNIVERSITIES}
+        items={[...UNIVERSITIES, ...MEDICAL_COLLEGES].sort((a, b) => a.localeCompare(b))}
         current={f.university}
         onPick={(u) => setF((prev) => ({ ...prev, university: u }))}
         onClose={() => setPicker(null)}

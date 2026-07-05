@@ -15,6 +15,7 @@ import { useApp } from '../state/AppContext';
 import { UNIVERSITIES } from '../data/universities';
 import { HOMETOWN_OPTIONS } from '../data/hometowns';
 import { COLLEGES } from '../data/colleges';
+import { MEDICAL_COLLEGES } from '../data/medicalColleges';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
@@ -31,7 +32,7 @@ const EMPTY_FILTERS = { university: '', hometown: '', area: '', college: '' };
 
 export default function DiscoverScreen({ navigation }) {
   const { user, directory, sendFriendRequest, respondFriendRequest, setMyLocation, isBlockedEither } = useApp();
-  const [tab, setTab] = useState('near'); // 'near' | 'people'
+  const [tab, setTab] = useState('near'); // 'near' | 'people' | 'friends' | 'anon'
   const [reqs, setReqs] = useState([]);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -111,6 +112,28 @@ export default function DiscoverScreen({ navigation }) {
       .sort((a, b) => a.km - b.km);
   }, [others, myCoords]);
 
+  // Friends tab: just my accepted friends (real IDs).
+  const friendsList = useMemo(
+    () => directory.filter((p) => (user.friends || []).includes(p.id) && !isBlockedEither(p.id)),
+    [directory, user.friends, user.blocked]
+  );
+
+  // Anonymous identities: anyone with anon mode ON + a nickname. Shown by
+  // nickname/avatar only — the real person is hidden (developer can still
+  // trace it via realAuthorId/anonFor in the database). Anyone can message
+  // an anonymous identity; no friend request needed.
+  const anonPeople = useMemo(
+    () => directory
+      .filter((p) => p.id !== user.id && p.anon?.on && (p.anon?.name || '').trim())
+      .map((p) => ({
+        id: p.id,
+        nick: p.anon.name,
+        emoji: p.anon.emoji || '🎭',
+        color: p.anon.color || '#4B3F72',
+      })),
+    [directory, user.id]
+  );
+
   const submitRequest = async () => {
     const target = noteFor;
     setNoteFor(null);
@@ -179,6 +202,35 @@ export default function DiscoverScreen({ navigation }) {
     );
   };
 
+  // Row for an anonymous identity — anyone can message it (opens an
+  // anonymous chat thread on the recipient's side).
+  const AnonRow = ({ a }) => (
+    <View style={[styles.card, shadow.card]}>
+      <View style={{
+        width: 50, height: 50, borderRadius: 25,
+        backgroundColor: a.color, alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Text style={{ fontSize: 24 }}>{a.emoji}</Text>
+      </View>
+      <View style={{ flex: 1, marginLeft: spacing.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ ...type.body, fontWeight: '700' }}>{a.nick}</Text>
+          <Text style={{ fontSize: 12 }}>🎭</Text>
+        </View>
+        <Text style={type.caption}>Anonymous · anyone can message</Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.primaryBtn, { backgroundColor: colors.anon }]}
+        onPress={() => navigation.navigate('ChatRoom', {
+          otherId: a.id, otherName: a.nick, toAnon: true,
+        })}
+      >
+        <Ionicons name="chatbubble" size={14} color="#fff" />
+        <Text style={styles.primaryBtnText}>Message</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const filterCount = activeFilters.length;
 
   return (
@@ -197,6 +249,8 @@ export default function DiscoverScreen({ navigation }) {
       <View style={styles.tabs}>
         <Chip label="Near me" active={tab === 'near'} onPress={() => setTab('near')} />
         <Chip label="People" active={tab === 'people'} onPress={() => setTab('people')} />
+        <Chip label="Friends" active={tab === 'friends'} onPress={() => setTab('friends')} />
+        <Chip label="🎭 Anonymous" active={tab === 'anon'} onPress={() => setTab('anon')} />
       </View>
 
       {filterCount > 0 && (
@@ -248,6 +302,39 @@ export default function DiscoverScreen({ navigation }) {
             renderItem={({ item }) => <PersonRow p={item} km={item.km} />}
           />
         )
+      ) : tab === 'friends' ? (
+        <FlatList
+          data={friendsList}
+          keyExtractor={(p) => p.id}
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}
+          ListEmptyComponent={
+            <Text style={[type.caption, { textAlign: 'center', marginTop: spacing.xl }]}>
+              No friends yet. Send a friend request from the People tab — once
+              they accept, they show here and you can chat.
+            </Text>
+          }
+          renderItem={({ item }) => <PersonRow p={item} />}
+        />
+      ) : tab === 'anon' ? (
+        <FlatList
+          data={anonPeople}
+          keyExtractor={(a) => a.id}
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}
+          ListHeaderComponent={
+            <View style={styles.shareRow}>
+              <Text style={{ fontSize: 15 }}>🎭</Text>
+              <Text style={[type.caption, { flex: 1 }]}>
+                Anonymous identities. Anyone can message them — no friend request needed.
+              </Text>
+            </View>
+          }
+          ListEmptyComponent={
+            <Text style={[type.caption, { textAlign: 'center', marginTop: spacing.xl }]}>
+              No one is in anonymous mode right now. Turn it on in Profile → Anonymous.
+            </Text>
+          }
+          renderItem={({ item }) => <AnonRow a={item} />}
+        />
       ) : (
         <FlatList
           data={others}
@@ -348,7 +435,7 @@ export default function DiscoverScreen({ navigation }) {
       <SearchPickerModal
         visible={picker === 'university'}
         title="Filter by university"
-        items={UNIVERSITIES}
+        items={[...UNIVERSITIES, ...MEDICAL_COLLEGES].sort((a, b) => a.localeCompare(b))}
         current={filters.university}
         onPick={(v) => setFilters({ ...filters, university: v })}
         onClose={() => setPicker(null)}

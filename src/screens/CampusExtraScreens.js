@@ -74,7 +74,7 @@ const useCol = (name) => {
 const EVENT_KINDS = ['Club event', 'Seminar', 'Research lecture', 'Workshop'];
 
 export function EventsScreen({ navigation }) {
-  const { user } = useApp();
+  const { user, crossPostToFeed } = useApp();
   const events = useCol('events');
   const [filter, setFilter] = useState('All');
   const [open, setOpen] = useState(false);
@@ -94,6 +94,10 @@ export function EventsScreen({ navigation }) {
         ...f, title: f.title.trim(),
         authorId: user.id, authorName: user.name,
         interested: [], createdAt: serverTimestamp(),
+      });
+      await crossPostToFeed({
+        campusKind: 'event', title: f.title.trim(),
+        text: `📅 ${f.kind}: ${f.title.trim()}\n${f.date}${f.venue ? ' · ' + f.venue : ''}${f.details ? '\n\n' + f.details : ''}`,
       });
       setOpen(false);
       setF({ kind: EVENT_KINDS[0], title: '', date: '', venue: '', details: '' });
@@ -188,7 +192,7 @@ export function EventsScreen({ navigation }) {
 
 // ================= LOST & FOUND =================
 export function LostFoundScreen({ navigation }) {
-  const { user } = useApp();
+  const { user, crossPostToFeed } = useApp();
   const items = useCol('lostfound');
   const [filter, setFilter] = useState('All');
   const [open, setOpen] = useState(false);
@@ -224,6 +228,11 @@ export function LostFoundScreen({ navigation }) {
         ...f, title: f.title.trim(),
         imageB64: imageB64 || null, resolved: false,
         authorId: user.id, authorName: user.name, createdAt: serverTimestamp(),
+      });
+      await crossPostToFeed({
+        campusKind: 'lostfound', title: f.title.trim(),
+        text: `${f.kind === 'lost' ? '🔍 LOST' : '📦 FOUND'}: ${f.title.trim()}${f.place ? '\n📍 ' + f.place : ''}${f.details ? '\n\n' + f.details : ''}`,
+        imageB64: imageB64 || null,
       });
       setOpen(false);
       setF({ kind: 'lost', title: '', details: '', place: '' });
@@ -337,7 +346,7 @@ export function LostFoundScreen({ navigation }) {
 
 // ================= ALUMNI =================
 export function AlumniScreen({ navigation }) {
-  const { user } = useApp();
+  const { user, crossPostToFeed } = useApp();
   const alumni = useCol('alumni');
   const [open, setOpen] = useState(false);
   const mine = useMemo(() => alumni.find((a) => a.id === user.id), [alumni, user.id]);
@@ -356,11 +365,18 @@ export function AlumniScreen({ navigation }) {
     if (!f.batch.trim()) { Alert.alert('Missing info', 'Add your batch (e.g. CSE 2018).'); return; }
     setBusy(true);
     try {
+      const wasListed = !!mine;
       await setDoc(doc(db, 'alumni', user.id), {
         ...f, batch: f.batch.trim(),
         authorId: user.id, authorName: user.name,
         createdAt: mine?.createdAt || serverTimestamp(),
       });
+      if (!wasListed) {
+        await crossPostToFeed({
+          campusKind: 'alumni', title: f.batch.trim(),
+          text: `🎓 Joined Alumni · Batch ${f.batch.trim()}${(f.role || f.org) ? '\n' + [f.role, f.org].filter(Boolean).join(' @ ') : ''}${f.note ? '\n\n' + f.note : ''}`,
+        });
+      }
       setOpen(false);
     } finally { setBusy(false); }
   };
@@ -434,7 +450,7 @@ export function AlumniScreen({ navigation }) {
 
 // ================= CLUBS =================
 export function ClubsScreen({ navigation }) {
-  const { user } = useApp();
+  const { user, crossPostToFeed } = useApp();
   const clubs = useCol('clubs');
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ name: '', tagline: '', about: '' });
@@ -449,6 +465,10 @@ export function ClubsScreen({ navigation }) {
         members: [user.id],
         authorId: user.id, authorName: user.name,
         createdAt: serverTimestamp(),
+      });
+      await crossPostToFeed({
+        campusKind: 'club', title: f.name.trim(),
+        text: `👥 New club: ${f.name.trim()}${f.tagline ? '\n' + f.tagline : ''}${f.about ? '\n\n' + f.about : ''}`,
       });
       setOpen(false);
       setF({ name: '', tagline: '', about: '' });
@@ -536,7 +556,7 @@ export function ClubsScreen({ navigation }) {
 
 // ================= SEMINARS =================
 export function SeminarsScreen({ navigation }) {
-  const { user } = useApp();
+  const { user, crossPostToFeed } = useApp();
   const seminars = useCol('seminars');
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ title: '', speaker: '', date: '', venue: '', details: '' });
@@ -554,6 +574,10 @@ export function SeminarsScreen({ navigation }) {
         interested: [],
         authorId: user.id, authorName: user.name,
         createdAt: serverTimestamp(),
+      });
+      await crossPostToFeed({
+        campusKind: 'seminar', title: f.title.trim(),
+        text: `🎤 Seminar: ${f.title.trim()}${f.speaker ? '\nSpeaker: ' + f.speaker : ''}\n${f.date}${f.venue ? ' · ' + f.venue : ''}${f.details ? '\n\n' + f.details : ''}`,
       });
       setOpen(false);
       setF({ title: '', speaker: '', date: '', venue: '', details: '' });

@@ -12,6 +12,7 @@ import { useApp } from '../state/AppContext';
 import { UNIVERSITIES } from '../data/universities';
 import { HOMETOWN_OPTIONS } from '../data/hometowns';
 import { COLLEGES } from '../data/colleges';
+import { MEDICAL_COLLEGES } from '../data/medicalColleges';
 
 const FILTER_FIELDS = [
   { key: 'university', label: 'University' },
@@ -115,7 +116,7 @@ function FilterModal({ visible, onClose, filters, setFilters }) {
       </View>
 
       <SearchPickerModal visible={picker === 'university'} title="Filter by university"
-        items={UNIVERSITIES} current={filters.university}
+        items={[...UNIVERSITIES, ...MEDICAL_COLLEGES].sort((a, b) => a.localeCompare(b))} current={filters.university}
         onPick={(v) => set('university', v)} onClose={() => setPicker(null)} allowCustom />
       <SearchPickerModal visible={picker === 'hometown'} title="Filter by hometown"
         items={HOMETOWN_OPTIONS} current={filters.hometown}

@@ -92,6 +92,8 @@ export function AppProvider({ children }) {
             role: p.role || 'student',
             subject: p.subject || '',
             batch: p.batch || '',
+            roleVerified: !!p.roleVerified,
+            eduEmail: p.eduEmail || '',
             anon: p.anon || { on: false, name: '', emoji: '🎭', color: '#4B3F72' },
             lastActive: p.lastActive || null,
           });
@@ -501,18 +503,100 @@ export function AppProvider({ children }) {
     });
 
   // ---- education profile ----
-  const saveEducation = (f) =>
-    updateDoc(doc(db, 'users', user.id), {
+  const saveEducation = (f) => {
+    const requested = f.role || 'student';
+    // Student is the default role and always works, verified or not.
+    // Teacher/Alumni only take effect once verified. Any role KEEPS its
+    // verified badge if it's already verified for that same role.
+    const canSetRole =
+      requested === 'student' || (user.roleVerified && user.role === requested);
+    // Switching to a role you haven't verified drops the badge; keeping the
+    // same role (or re-selecting an already-verified one) preserves it.
+    const keepVerified = user.roleVerified && user.role === requested;
+    return updateDoc(doc(db, 'users', user.id), {
       university: f.university || '',
       college: f.college || '',
       major: f.major || '',
       minorField: f.minorField || '',
       researchPapers: f.researchPapers || '',
       interests: f.interests || [],
-      role: f.role || 'student',
       subject: f.subject || '',
       batch: f.batch || '',
+      ...(canSetRole
+        ? { role: requested, ...(keepVerified ? {} : { roleVerified: false, eduEmail: '' }) }
+        : {}),
     });
+  };
+
+  // ---- role verification by university / student email ----
+  // Sends a real Firebase confirmation email to the education address; the
+  // role activates only after the link is clicked. Uses a secondary auth
+  // app so it never disturbs the person's main login session.
+  const requestRoleVerification = async (requestedRole, eduEmail) => {
+    const email = (eduEmail || '').trim().toLowerCase();
+    if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) {
+      return { error: 'Enter a valid email address.' };
+    }
+    // Basic sanity: personal inboxes can't prove a role.
+    const personal = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'proton.me'];
+    const domain = email.split('@')[1];
+    if (requestedRole !== 'alumni' && personal.includes(domain)) {
+      return { error: 'Use your university / institutional email (not a personal Gmail/Yahoo) to verify this role.' };
+    }
+    try {
+      const { initializeApp, getApps } = await import('firebase/app');
+      const fbAuth = await import('firebase/auth');
+      const cfg = auth.app.options;
+      const secondary =
+        getApps().find((a) => a.name === 'roleVerify') ||
+        initializeApp(cfg, 'roleVerify');
+      const sAuth = fbAuth.getAuth(secondary);
+      // Create-or-sign-in a throwaway credential on the edu email so Firebase
+      // will send it a verification link. Password is deterministic per uid.
+      const pwd = `Utopia!${user.id.slice(0, 12)}`;
+      let cred;
+      try {
+        cred = await fbAuth.createUserWithEmailAndPassword(sAuth, email, pwd);
+      } catch (e) {
+        if (e.code === 'auth/email-already-in-use') {
+          cred = await fbAuth.signInWithEmailAndPassword(sAuth, email, pwd);
+        } else {
+          throw e;
+        }
+      }
+      await fbAuth.sendEmailVerification(cred.user);
+      await updateDoc(doc(db, 'users', user.id), {
+        role: requestedRole, eduEmail: email, roleVerified: false,
+      });
+      await fbAuth.signOut(sAuth);
+      return { ok: true };
+    } catch (e) {
+      return { error: e?.message || String(e) };
+    }
+  };
+
+  // Re-check whether the edu email link was clicked; flips roleVerified true.
+  const checkRoleVerified = async () => {
+    const email = (user.eduEmail || '').trim().toLowerCase();
+    if (!email) return false;
+    try {
+      const { initializeApp, getApps } = await import('firebase/app');
+      const fbAuth = await import('firebase/auth');
+      const secondary =
+        getApps().find((a) => a.name === 'roleVerify') ||
+        initializeApp(auth.app.options, 'roleVerify');
+      const sAuth = fbAuth.getAuth(secondary);
+      const pwd = `Utopia!${user.id.slice(0, 12)}`;
+      const cred = await fbAuth.signInWithEmailAndPassword(sAuth, email, pwd);
+      await cred.user.reload();
+      const ok = cred.user.emailVerified;
+      await fbAuth.signOut(sAuth);
+      if (ok) await updateDoc(doc(db, 'users', user.id), { roleVerified: true });
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  };
 
   // ---- posts ----
   const addPost = async ({ text, anonymous, imageB64 }) => {
@@ -521,10 +605,35 @@ export function AppProvider({ children }) {
       anonymous: !!anonymous,
       authorName: anonymous ? null : user.name,
       authorDept: anonymous ? null : user.dept,
+      authorRole: anonymous ? null : (user.roleVerified ? (user.role || 'student') : null),
+      authorSubject: anonymous ? null : (user.roleVerified ? (user.subject || '') : ''),
       anonName: anonymous && user.anon?.on ? (user.anon.name || null) : null,
       anonAvatar: anonymous && user.anon?.on
         ? { emoji: user.anon.emoji || '🎭', color: user.anon.color || '#4B3F72' }
         : null,
+      realAuthorId: user.id,
+      imageB64: imageB64 || null,
+      reactions: {},
+      likedBy: [],
+      savedBy: [],
+      commentsCount: 0,
+      createdAt: serverTimestamp(),
+    });
+  };
+
+  // Campus sections (Events, Lost & Found, Clubs, Seminars, Alumni) also
+  // appear in the main feed as normal posts — so people can react & comment.
+  // `campusKind` tags them so the feed shows a labelled badge.
+  const crossPostToFeed = async ({ campusKind, title, text, imageB64 }) => {
+    await addDoc(collection(db, 'posts'), {
+      text: text || '',
+      campusKind: campusKind || null,      // 'event' | 'lostfound' | 'club' | 'seminar' | 'alumni'
+      campusTitle: title || '',
+      anonymous: false,
+      authorName: user.name,
+      authorDept: user.dept,
+      authorRole: user.roleVerified ? (user.role || 'student') : null,
+      authorSubject: user.roleVerified ? (user.subject || '') : '',
       realAuthorId: user.id,
       imageB64: imageB64 || null,
       reactions: {},
@@ -617,11 +726,12 @@ export function AppProvider({ children }) {
       signUp, signIn, signOut,
       signInWithGoogle, resendVerification, refreshVerification,
       directory, usersById,
-      posts, addPost, reactToPost, toggleSave, deletePost,
+      posts, addPost, crossPostToFeed, reactToPost, toggleSave, deletePost,
       stories, addStory, deleteStory,
       addComment, voteComment,
       saveAccount, updateProfilePhoto, setMyLocation,
       saveSettings, saveEducation, saveAnon, presenceOf,
+      requestRoleVerification, checkRoleVerified,
       unfriend, blockUser, unblockUser, isBlockedEither,
       sendFriendRequest, respondFriendRequest, uiTick,
       notifications, unreadCount, markNotificationsRead,

@@ -10,7 +10,7 @@
       "backgroundColor": "#067D5A"
     },
     "android": {
-      "package": "com.yourname.utopia",
+      "package": "com.nabib.utopia",
       "versionCode": 1,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",

@@ -8,7 +8,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing, type, shadow, ThemedSheet } from '../theme';
 import { useApp } from '../state/AppContext';
 
-const EMOJIS = ['🎭', '🦊', '🐼', '🦉', '🐯', '🦁', '🐸', '🐙', '🦄', '👻', '🤖', '🐰', '🐨', '🐻', '🦋', '🌙'];
+const EMOJIS = [
+  // originals
+  '🎭', '🦊', '🐼', '🦉', '🐯', '🦁', '🐸', '🐙', '🦄', '👻', '🤖', '🐰', '🐨', '🐻', '🦋', '🌙',
+  // heroes & warriors (original, no branded characters)
+  '🦸', '🦹', '🥷', '⚔️', '🛡️', '🏹', '🗡️', '👑', '⚡', '🔥', '💥', '🦾',
+  // sports
+  '⚽', '🏀', '🏈', '🎾', '🏏', '🥅', '🏆', '🥇', '🎽', '🥊',
+  // birds
+  '🦅', '🦆', '🦢', '🦜', '🕊️', '🦚', '🐦', '🦩',
+  // mystical / fantasy
+  '🐉', '🧙', '🧚', '🧛', '🔮', '🌟', '☄️', '🪄',
+  // anime-style faces & expressions
+  '😎', '🤩', '😼', '👾', '💫', '🌸',
+  // more animals
+  '🐺', '🦖', '🦈', '🐍', '🦂', '🐢', '🦓', '🐲',
+];
 const COLORS = ['#4B3F72', '#0E5FA8', '#B4654A', '#067D5A', '#93381A', '#3E2B74'];
 
 export default function AnonymousScreen({ navigation }) {

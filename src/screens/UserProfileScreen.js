@@ -216,17 +216,26 @@ export default function UserProfileScreen({ route, navigation }) {
               {!!profile?.role && (
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', gap: 5,
-                  backgroundColor: colors.primarySoft, borderRadius: 999,
+                  backgroundColor: profile.roleVerified ? colors.primarySoft : colors.bg,
+                  borderWidth: profile.roleVerified ? 0 : 1,
+                  borderColor: colors.line,
+                  borderRadius: 999,
                   paddingHorizontal: 10, paddingVertical: 4, marginTop: spacing.sm,
                 }}>
                   <Text style={{ fontSize: 12 }}>
                     {profile.role === 'teacher' ? '👨‍🏫' : profile.role === 'alumni' ? '🎓' : '📚'}
                   </Text>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primaryDark }}>
+                  <Text style={{
+                    fontSize: 12, fontWeight: '800',
+                    color: profile.roleVerified ? colors.primaryDark : colors.inkSoft,
+                  }}>
                     {profile.role === 'teacher' ? 'Teacher' : profile.role === 'alumni' ? 'Alumni' : 'Student'}
                     {profile.subject ? ` · ${profile.subject}` : ''}
                     {profile.batch ? ` · ${profile.batch}` : ''}
                   </Text>
+                  {profile.roleVerified
+                    ? <Ionicons name="checkmark-circle" size={13} color={colors.primary} />
+                    : <Text style={{ fontSize: 10, color: colors.inkSoft }}>· unverified</Text>}
                 </View>
               )}
               {!!(profile?.major || profile?.minorField) && (
@@ -252,10 +261,12 @@ export default function UserProfileScreen({ route, navigation }) {
               {!isMe && (
                 <View style={styles.btnRow}>
                   <FriendButton />
-                  <TouchableOpacity style={styles.softBtn} onPress={openChat}>
-                    <Ionicons name="chatbubble" size={16} color={colors.primary} />
-                    <Text style={styles.softBtnText}>Chat</Text>
-                  </TouchableOpacity>
+                  {isFriend && (
+                    <TouchableOpacity style={styles.softBtn} onPress={openChat}>
+                      <Ionicons name="chatbubble" size={16} color={colors.primary} />
+                      <Text style={styles.softBtnText}>Chat</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity style={styles.iconBtn} onPress={() => call('Voice')}>
                     <Ionicons name="call" size={17} color={colors.primary} />
                   </TouchableOpacity>

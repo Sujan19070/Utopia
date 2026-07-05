@@ -130,9 +130,16 @@ export function PostCard({ post, myId, onReact, onOpenComments, onOpenProfile, o
     ? (post.authorSubject ? `Teacher · ${post.authorSubject}` : 'Teacher')
     : post.authorRole === 'alumni'
       ? 'Alumni'
-      : (post.authorDept || 'Student');
+      : post.authorRole === 'student'
+        ? 'Student'
+        : (post.authorDept || 'Student');
+  // A badge only shows for a VERIFIED role (authorRole is only set when verified).
   const roleIcon = post.authorRole === 'teacher' ? '👨‍🏫'
-    : post.authorRole === 'alumni' ? '🎓' : null;
+    : post.authorRole === 'alumni' ? '🎓'
+    : post.authorRole === 'student' ? '🎓' : null;
+  const roleBadgeText = post.authorRole === 'teacher' ? 'Teacher'
+    : post.authorRole === 'alumni' ? 'Alumni'
+    : post.authorRole === 'student' ? 'Student' : '';
   const sub = post.anonymous ? 'Identity hidden' : roleLabel;
   const canVisit = !post.anonymous && onOpenProfile;
 
@@ -169,8 +176,9 @@ export function PostCard({ post, myId, onReact, onOpenComments, onOpenProfile, o
               }}>
                 <Text style={{ fontSize: 10 }}>{roleIcon}</Text>
                 <Text style={{ fontSize: 10.5, fontWeight: '800', color: colors.primaryDark }}>
-                  {post.authorRole === 'teacher' ? 'Teacher' : 'Alumni'}
+                  {roleBadgeText}
                 </Text>
+                <Ionicons name="checkmark-circle" size={11} color={colors.primary} />
               </View>
             )}
           </View>
@@ -183,6 +191,29 @@ export function PostCard({ post, myId, onReact, onOpenComments, onOpenProfile, o
           </View>
         )}
       </TouchableOpacity>
+
+      {!!post.campusKind && (
+        <View style={styles.campusBadge}>
+          <Ionicons
+            name={
+              post.campusKind === 'event' ? 'calendar'
+              : post.campusKind === 'lostfound' ? 'search'
+              : post.campusKind === 'club' ? 'people'
+              : post.campusKind === 'seminar' ? 'mic'
+              : 'ribbon'
+            }
+            size={12}
+            color={colors.primaryDark}
+          />
+          <Text style={styles.campusBadgeText}>
+            {post.campusKind === 'event' ? 'Campus Event'
+              : post.campusKind === 'lostfound' ? 'Lost & Found'
+              : post.campusKind === 'club' ? 'Club'
+              : post.campusKind === 'seminar' ? 'Seminar'
+              : 'Alumni'}
+          </Text>
+        </View>
+      )}
 
       {!!post.text && <Text style={[type.body, { marginTop: spacing.md }]}>{post.text}</Text>}
 
@@ -324,6 +355,12 @@ const styles = ThemedSheet(() => ({
     paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.pill,
   },
   anonBadgeText: { fontSize: 11, fontWeight: '700', color: colors.anon },
+  campusBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
+    backgroundColor: colors.primarySoft, borderRadius: 999,
+    paddingHorizontal: 10, paddingVertical: 4, marginTop: spacing.md,
+  },
+  campusBadgeText: { fontSize: 11, fontWeight: '800', color: colors.primaryDark },
   reactorsBox: {
     position: 'absolute', left: spacing.xl, right: spacing.xl, top: '25%',
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.xl,

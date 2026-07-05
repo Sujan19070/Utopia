@@ -11,6 +11,7 @@ import { UNIVERSITIES } from '../data/universities';
 import { HOMETOWN_OPTIONS } from '../data/hometowns';
 import { SearchPickerModal, SelectField } from '../components/pickers';
 import { COLLEGES } from '../data/colleges';
+import { MEDICAL_COLLEGES } from '../data/medicalColleges';
 
 function Field({ label, value, onChange, placeholder, readOnly, keyboardType, autoCapitalize }) {
   return (
@@ -137,7 +138,7 @@ export default function MyAccountScreen({ navigation }) {
       <SearchPickerModal
         visible={picker === 'university'}
         title="Select your university"
-        items={UNIVERSITIES}
+        items={[...UNIVERSITIES, ...MEDICAL_COLLEGES].sort((a, b) => a.localeCompare(b))}
         current={f.university}
         onPick={(u) => setF((prev) => ({ ...prev, university: u }))}
         onClose={() => setPicker(null)}
