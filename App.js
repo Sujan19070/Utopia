@@ -14,6 +14,7 @@ import { t } from './src/i18n/strings';
 import AuthScreen from './src/screens/AuthScreen';
 import VerifyEmailScreen from './src/screens/VerifyEmailScreen';
 import AnonymousScreen from './src/screens/AnonymousScreen';
+import FacultyReviewScreen from './src/screens/FacultyReviewScreen';
 import FeedScreen from './src/screens/FeedScreen';
 import CreatePostScreen from './src/screens/CreatePostScreen';
 import CreateStoryScreen from './src/screens/CreateStoryScreen';
@@ -115,6 +116,7 @@ function Root() {
       <Stack.Screen name="Seminars" component={SeminarsScreen} />
       <Stack.Screen name="LostFound" component={LostFoundScreen} />
       <Stack.Screen name="Alumni" component={AlumniScreen} />
+      <Stack.Screen name="FacultyReview" component={FacultyReviewScreen} />
       <Stack.Screen name="Spotlight" component={SpotlightScreen} />
       <Stack.Screen name="Education" component={EducationScreen} />
       <Stack.Screen name="Jobs" component={JobsScreen} />

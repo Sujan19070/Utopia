@@ -108,7 +108,7 @@ export default function MyEducationScreen({ navigation }) {
         <View style={{ width: 26 }} />
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}>
           <Text style={[type.label, { marginBottom: spacing.sm }]}>I am a…</Text>
           <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>

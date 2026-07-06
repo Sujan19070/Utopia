@@ -197,7 +197,7 @@ export default function CommentsScreen({ route, navigation }) {
         )}
       />
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior="padding">
         {suggestions.length > 0 && (
           <ScrollView horizontal style={styles.suggestBar} keyboardShouldPersistTaps="always">
             {suggestions.map((u) => (

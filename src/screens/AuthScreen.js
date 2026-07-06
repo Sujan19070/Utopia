@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, Image,
   KeyboardAvoidingView, Platform, Switch, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { useApp } from '../state/AppContext';
 import { FIREBASE_READY } from '../config/firebase';
 
 export default function AuthScreen() {
-  const { signIn, signUp, signInWithGoogle, authError, setAuthError } = useApp();
+  const { signIn, signUp, signInWithGoogle, resetPassword, authError, setAuthError } = useApp();
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -17,6 +17,26 @@ export default function AuthScreen() {
   const [isAdult, setIsAdult] = useState(false);
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [resetMsg, setResetMsg] = useState('');
+
+  const forgot = async () => {
+    setLocalError('');
+    setAuthError('');
+    setResetMsg('');
+    if (!email.trim()) {
+      setLocalError('Type your email above first, then tap "Forgot password?" again.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await resetPassword(email);
+      setResetMsg(`Password reset link sent to ${email.trim()}. Open the email, set a new password, then sign in with it.`);
+    } catch (e) {
+      setLocalError(String(e?.message || e).replace('Firebase: ', ''));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const error = localError || authError;
 
@@ -53,12 +73,10 @@ export default function AuthScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
     >
       <View style={styles.hero}>
-        <View style={styles.logo}>
-          <Ionicons name="school" size={30} color="#fff" />
-        </View>
+        <Image source={require('../../assets/logo.png')} style={styles.logo} />
         <Text style={[type.display, { color: '#fff', marginTop: spacing.lg }]}>Utopia</Text>
         <Text style={{ color: '#CFEDE2', marginTop: 6, fontSize: 14 }}>
           Your university. Friends, dates, notes and jobs — one app.
@@ -106,6 +124,18 @@ export default function AuthScreen() {
           value={password}
           onChangeText={setPassword}
         />
+        {mode === 'signin' && (
+          <TouchableOpacity onPress={forgot} disabled={busy} style={{ alignSelf: 'flex-end', marginTop: 6 }}>
+            <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 13 }}>
+              Forgot password? / Change password
+            </Text>
+          </TouchableOpacity>
+        )}
+        {resetMsg ? (
+          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12.5, marginTop: spacing.sm }}>
+            {resetMsg}
+          </Text>
+        ) : null}
 
         <View style={styles.ageRow}>
           <Switch value={isAdult} onValueChange={setIsAdult} trackColor={{ true: colors.primary }} />
@@ -138,8 +168,7 @@ const styles = ThemedSheet(() => ({
   root: { flex: 1, backgroundColor: colors.primary },
   hero: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.xl },
   logo: {
-    width: 58, height: 58, borderRadius: 18,
-    backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center',
+    width: 76, height: 76, borderRadius: 20,
   },
   sheet: {
     backgroundColor: colors.surface,

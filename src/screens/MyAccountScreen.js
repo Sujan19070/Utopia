@@ -81,7 +81,7 @@ export default function MyAccountScreen({ navigation }) {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
       >
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}>
           <Field label="Name" value={f.name} onChange={set('name')} placeholder="Your full name" />

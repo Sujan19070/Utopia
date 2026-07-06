@@ -720,6 +720,16 @@ export function ChatRoomScreen({ route, navigation }) {
           onPress={() => item.edited && !item.deleted && setHistMsg(item)}
           style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
         >
+          {item.storyReply && (
+            <View style={[styles.quote, { borderLeftColor: mine ? '#fff' : colors.accent }]}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: mine ? '#EAF7F1' : colors.accent }}>
+                ↩ Reply to story
+              </Text>
+              <Text numberOfLines={1} style={{ fontSize: 12, color: mine ? '#D6EEE4' : colors.inkSoft }}>
+                {item.storyReply.preview}
+              </Text>
+            </View>
+          )}
           {item.replyTo && (
             <View style={[styles.quote, { borderLeftColor: mine ? '#fff' : colors.primary }]}>
               <Text style={{ fontSize: 11.5, fontWeight: '800', color: mine ? '#EAF7F1' : colors.primaryDark }}>
@@ -869,7 +879,7 @@ export function ChatRoomScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
       ) : (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView behavior="padding">
           {replyTo && (
             <View style={styles.topBanner}>
               <Ionicons name="return-up-back" size={15} color={colors.primaryDark} />

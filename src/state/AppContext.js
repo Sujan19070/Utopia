@@ -11,6 +11,7 @@ import {
   onAuthStateChanged,
   signOut as fbSignOut,
   sendEmailVerification,
+  sendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithCredential,
 } from 'firebase/auth';
@@ -140,6 +141,8 @@ export function AppProvider({ children }) {
     friend_request: () => 'sent you a friend request',
     friend_accept: () => 'accepted your friend request',
     message: (n) => n.preview || 'sent you a message',
+    story_reaction: (n) => `reacted ${n.emoji || ''} to your story`,
+    story_reply: (n) => `replied to your story: "${n.preview || ''}"`,
   };
 
   const fireLocal = async (n) => {
@@ -257,6 +260,49 @@ export function AppProvider({ children }) {
     await deleteDoc(doc(db, 'stories', story.id));
   };
 
+  // React to a story (one reaction per person, stored on the story doc).
+  const reactToStory = async (story, key) => {
+    const cur = story.reactions?.[user.id];
+    await updateDoc(doc(db, 'stories', story.id), {
+      [`reactions.${user.id}`]: cur === key ? deleteField() : key,
+    });
+    if (cur !== key && story.authorId !== user.id) {
+      notify(story.authorId, 'story_reaction', {
+        emoji: EMOJI[key],
+        preview: story.text ? story.text.slice(0, 40) : 'your story',
+      });
+    }
+  };
+
+  // Reply to a story: delivered as a normal 1:1 chat message to the owner,
+  // quoting the story. Story replies bypass the friends-only rule so anyone
+  // who can see a story can respond to it (like Instagram).
+  const replyToStory = async (story, text) => {
+    const body = (text || '').trim();
+    if (!body || story.authorId === user.id) return;
+    const cid = [user.id, story.authorId].sort().join('_');
+    await addDoc(collection(db, 'chats', cid, 'messages'), {
+      senderId: user.id,
+      senderName: user.name,
+      type: 'text',
+      text: body,
+      reactions: {},
+      storyReply: {
+        preview: story.text ? story.text.slice(0, 60) : (story.imageB64 ? '📷 Photo story' : 'Story'),
+        bg: story.bg || null,
+      },
+      createdAt: serverTimestamp(),
+    });
+    await setDoc(doc(db, 'chats', cid), {
+      participants: [user.id, story.authorId],
+      names: { [user.id]: user.name, [story.authorId]: story.authorName },
+      lastMessage: `↩️ Replied to story: ${body.slice(0, 40)}`,
+      updatedAt: serverTimestamp(),
+      storyReplyAllowed: true,
+    }, { merge: true });
+    notify(story.authorId, 'story_reply', { preview: body.slice(0, 60), chatId: cid });
+  };
+
   // ---- notifications ----
   useEffect(() => {
     if (!user) { setNotifications([]); return; }
@@ -345,6 +391,9 @@ export function AppProvider({ children }) {
     const { GoogleSignin } = GS;
     GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    // Clear any cached Google account first so the account CHOOSER always
+    // appears (otherwise Google silently reuses the last account).
+    try { await GoogleSignin.signOut(); } catch (e) {}
     const res = await GoogleSignin.signIn();
     const idToken = res?.data?.idToken || res?.idToken;
     if (!idToken) throw new Error('Google did not return a sign-in token.');
@@ -368,6 +417,14 @@ export function AppProvider({ children }) {
     } catch (e) {
       setAuthError(friendly(e));
     }
+  };
+
+  // Send a Firebase password-reset email; the person sets a new password
+  // from the link, then signs in with it.
+  const resetPassword = async (email) => {
+    const e = (email || '').trim().toLowerCase();
+    if (!/^[^@]+@[^@]+\.[^@]+$/.test(e)) throw new Error('Enter a valid email address first.');
+    await sendPasswordResetEmail(auth, e);
   };
 
   const signOut = () => fbSignOut(auth);
@@ -724,10 +781,10 @@ export function AppProvider({ children }) {
     () => ({
       user, booting, authError, setAuthError,
       signUp, signIn, signOut,
-      signInWithGoogle, resendVerification, refreshVerification,
+      signInWithGoogle, resetPassword, resendVerification, refreshVerification,
       directory, usersById,
       posts, addPost, crossPostToFeed, reactToPost, toggleSave, deletePost,
-      stories, addStory, deleteStory,
+      stories, addStory, deleteStory, reactToStory, replyToStory,
       addComment, voteComment,
       saveAccount, updateProfilePhoto, setMyLocation,
       saveSettings, saveEducation, saveAnon, presenceOf,

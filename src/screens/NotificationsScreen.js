@@ -14,6 +14,8 @@ const META = {
   friend_request: { icon: 'person-add', color: colors.primary, text: () => 'sent you a friend request' },
   friend_accept: { icon: 'people', color: colors.primary, text: () => 'accepted your friend request — you are now friends' },
   message: { icon: 'chatbubble-ellipses', color: colors.primary, text: () => 'sent you a message' },
+  story_reaction: { icon: 'heart', color: colors.danger, text: (n) => `reacted ${n.emoji || ''} to your story` },
+  story_reply: { icon: 'return-down-forward', color: colors.primary, text: () => 'replied to your story' },
 };
 
 export default function NotificationsScreen({ navigation }) {
@@ -26,12 +28,13 @@ export default function NotificationsScreen({ navigation }) {
   }, []);
 
   const open = (n) => {
-    if (n.type === 'message') {
+    if (n.type === 'message' || n.type === 'story_reply') {
       navigation.navigate('ChatRoom', n.chatId
         ? { chatId: n.chatId }
         : { otherId: n.fromId, otherName: n.fromName });
       return;
     }
+    if (n.type === 'story_reaction') return;
     if (n.type === 'friend_request' || n.type === 'friend_accept') {
       navigation.push('UserProfile', { userId: n.fromId, name: n.fromName });
       return;

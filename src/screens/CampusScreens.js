@@ -17,6 +17,7 @@ const HUB = [
   { key: 'Seminars', icon: 'mic', title: 'Seminars', desc: 'Seminars, research lectures, talks', tone: '#C4823B', live: true },
   { key: 'LostFound', icon: 'search', title: 'Lost & Found', desc: 'Lost something on campus? Found something?', tone: '#B4654A', live: true },
   { key: 'Alumni', icon: 'ribbon', title: 'Alumni', desc: 'Graduates — guidance, referrals, connections', tone: '#4B3F72', live: true },
+  { key: 'FacultyReview', icon: 'star', title: 'Faculty review', desc: 'Anonymous teacher & course reviews with ratings and CG', tone: '#B4832F', live: true },
   { key: 'Spotlight', icon: 'sparkles', title: 'Campus Spotlight', desc: 'Weekly featured students — opt in and get votes', tone: colors.accent },
   { key: 'Education', icon: 'book', title: 'Education', desc: 'Notes, past papers, study groups, workshops', tone: '#067D5A' },
   { key: 'Jobs', icon: 'briefcase', title: 'Jobs & internships', desc: 'Part-time work, internships, campus gigs', tone: '#4A6FB4' },
