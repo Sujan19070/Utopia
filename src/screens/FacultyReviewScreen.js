@@ -1,16 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet,
+  View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert,
   Modal, ActivityIndicator, ScrollView, KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  collection, addDoc, onSnapshot, serverTimestamp,
+  collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { colors, radius, spacing, type, shadow, ThemedSheet } from '../theme';
-import { timeAgo } from '../components/ui';
+import { timeAgo, FeedActions } from '../components/ui';
 import { SearchPickerModal, SelectField } from '../components/pickers';
 import { useApp } from '../state/AppContext';
 import { AIUB_FACULTY } from '../data/aiubFaculty';
@@ -38,7 +38,7 @@ const Stars = ({ value, size = 16, onPress }) => (
 );
 
 export default function FacultyReviewScreen({ navigation }) {
-  const { user } = useApp();
+  const { user, crossPostToFeed, isAdmin, usersById } = useApp();
   const [reviews, setReviews] = useState(null);
   const [filterFaculty, setFilterFaculty] = useState('');
   const [picker, setPicker] = useState(null); // 'filter' | 'form'
@@ -81,7 +81,7 @@ export default function FacultyReviewScreen({ navigation }) {
     if (!f.cg.trim()) return setErr('Enter your current CG — it keeps reviews honest.');
     setBusy(true);
     try {
-      await addDoc(collection(db, 'facultyReviews'), {
+      const secRef = await addDoc(collection(db, 'facultyReviews'), {
         faculty: f.faculty,
         course: f.course.trim(),
         rating: f.rating,
@@ -91,6 +91,11 @@ export default function FacultyReviewScreen({ navigation }) {
         realAuthorId: user.id, // hidden from users; developer-traceable
         createdAt: serverTimestamp(),
       });
+      const feedId = await crossPostToFeed({
+        campusKind: 'review', title: f.faculty, anonymous: true,
+        text: `${'★'.repeat(f.rating)}${'☆'.repeat(5 - f.rating)} ${RATING_LABELS[f.rating]}\n${f.faculty}\nCourse: ${f.course.trim()} · CG ${f.cg.trim()}\n\n${f.review.trim()}${f.tips.trim() ? '\n\n💡 ' + f.tips.trim() : ''}`,
+      });
+      await updateDoc(secRef, { feedPostId: feedId });
       setOpen(false);
       setF({ faculty: '', course: '', rating: 0, review: '', tips: '', cg: '' });
     } catch (e) {
@@ -107,10 +112,28 @@ export default function FacultyReviewScreen({ navigation }) {
         <View style={{ flex: 1 }}>
           <Text style={{ ...type.body, fontWeight: '800' }}>{r.faculty}</Text>
           <Text style={type.caption}>{r.course} · {timeAgo(r.createdAt)}</Text>
+          {isAdmin && (
+            <TouchableOpacity onPress={() => navigation.navigate('UserProfile', {
+              userId: r.realAuthorId, name: usersById?.[r.realAuthorId]?.name,
+            })}>
+              <Text style={[type.caption, { color: colors.anon, fontWeight: '700' }]}>
+                🔍 {usersById?.[r.realAuthorId]?.name || r.realAuthorId} · tap to open
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
         <View style={styles.cgPill}>
           <Text style={{ fontSize: 11.5, fontWeight: '800', color: colors.primaryDark }}>CG {r.cg}</Text>
         </View>
+        {(r.realAuthorId === user.id || isAdmin) && (
+          <TouchableOpacity onPress={() => Alert.alert('Delete your review?',
+            'This removes it for everyone and cannot be undone.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: () => deleteDoc(doc(db, 'facultyReviews', r.id)) },
+            ])}>
+            <Ionicons name="trash-outline" size={18} color={colors.danger} />
+          </TouchableOpacity>
+        )}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.sm }}>
         <Stars value={r.rating || 0} />
@@ -125,6 +148,7 @@ export default function FacultyReviewScreen({ navigation }) {
           <Text style={[type.body, { marginTop: 4 }]}>{r.tips}</Text>
         </View>
       )}
+      <FeedActions feedPostId={r.feedPostId} navigation={navigation} />
     </View>
   );
 

@@ -129,6 +129,34 @@ export default function ProfileScreen({ navigation }) {
 
         <TouchableOpacity
           style={[styles.bigBtn, shadow.card]}
+          onPress={() => navigation.navigate('Developer')}
+        >
+          <View style={[styles.bigIcon, { backgroundColor: '#4A6FB4' }]}>
+            <Ionicons name="code-slash" size={22} color="#fff" />
+          </View>
+          <View style={{ flex: 1, marginLeft: spacing.md }}>
+            <Text style={{ ...type.body, fontWeight: '800' }}>Developer</Text>
+            <Text style={type.caption}>Who built Utopia & why</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.inkSoft} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.bigBtn, shadow.card]}
+          onPress={() => navigation.navigate('Feedback')}
+        >
+          <View style={[styles.bigIcon, { backgroundColor: colors.accent }]}>
+            <Ionicons name="chatbox-ellipses" size={22} color="#fff" />
+          </View>
+          <View style={{ flex: 1, marginLeft: spacing.md }}>
+            <Text style={{ ...type.body, fontWeight: '800' }}>Feedback</Text>
+            <Text style={type.caption}>Tell the developer what to improve</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.inkSoft} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.bigBtn, shadow.card]}
           onPress={() => navigation.navigate('Settings')}
         >
           <View style={[styles.bigIcon, { backgroundColor: colors.inkSoft }]}>

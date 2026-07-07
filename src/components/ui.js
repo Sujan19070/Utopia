@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Modal, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Modal, ScrollView , TextInput
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing, type, shadow, ThemedSheet } from '../theme';
 import { REACTIONS, EMOJI, useApp } from '../state/AppContext';
@@ -112,11 +113,123 @@ export function SectionHeader({ label, action, onAction }) {
 }
 
 // ---- Post card ----
+const REPORT_REASONS = [
+  'Spam', 'Harassment or bullying', 'Hate speech', 'Sexual content',
+  'False information', 'Scam or fraud', 'Dangerous or harmful', 'Other',
+];
+
+// Report a post: common reasons + an optional note. Reports go to the
+// admin-only Reports section in Campus.
+export function ReportModal({ visible, onClose, onSubmit }) {
+  const [reason, setReason] = useState('');
+  const [note, setNote] = useState('');
+  const [sent, setSent] = useState(false);
+
+  const submit = async () => {
+    if (!reason) { Alert.alert('Report', 'Pick a reason first.'); return; }
+    await onSubmit(reason, note);
+    setSent(true);
+    setTimeout(() => { setSent(false); setReason(''); setNote(''); onClose(); }, 1200);
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <TouchableOpacity style={styles.reportDim} activeOpacity={1} onPress={onClose} />
+      <View style={styles.reportSheet}>
+        <View style={styles.reportHandle} />
+        {sent ? (
+          <View style={{ alignItems: 'center', paddingVertical: 30 }}>
+            <Ionicons name="checkmark-circle" size={40} color={colors.primary} />
+            <Text style={{ ...type.title, marginTop: 8 }}>Report sent</Text>
+            <Text style={type.caption}>The admin will review it. Thank you.</Text>
+          </View>
+        ) : (
+          <>
+            <Text style={[type.title, { textAlign: 'center' }]}>Report this post</Text>
+            <Text style={[type.caption, { textAlign: 'center', marginBottom: spacing.md }]}>
+              Your report is only visible to the admin.
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {REPORT_REASONS.map((r) => (
+                <TouchableOpacity key={r}
+                  style={[styles.reportChip, reason === r && styles.reportChipOn]}
+                  onPress={() => setReason(r)}>
+                  <Text style={[styles.reportChipText, reason === r && { color: '#fff' }]}>{r}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={styles.reportInput}
+              placeholder="Why are you reporting this? (optional)"
+              placeholderTextColor={colors.inkSoft}
+              multiline
+              value={note}
+              onChangeText={setNote}
+            />
+            <TouchableOpacity style={styles.reportBtn} onPress={submit}>
+              <Text style={{ color: '#fff', fontWeight: '800' }}>Send report</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+// Compact react + comment bar for campus section cards, operating on the
+// post's linked FEED copy — so reactions, comments and mentions are the
+// same everywhere.
+export function FeedActions({ feedPostId, navigation }) {
+  const { posts, reactToPost, user } = useApp() || {};
+  const feedPost = (posts || []).find((p) => p.id === feedPostId);
+  if (!feedPost) return null;
+
+  const myKey = feedPost.reactions?.[user.id] ||
+    ((feedPost.likedBy || []).includes(user.id) ? 'love' : null);
+  const counts = {};
+  Object.values(feedPost.reactions || {}).forEach((k) => { counts[k] = (counts[k] || 0) + 1; });
+  (feedPost.likedBy || []).forEach((uid) => {
+    if (!feedPost.reactions?.[uid]) counts.love = (counts.love || 0) + 1;
+  });
+
+  return (
+    <View style={styles.feedActionsRow}>
+      {REACTIONS.map((r) => (
+        <TouchableOpacity
+          key={r.key}
+          style={[styles.feedActionChip, myKey === r.key && styles.feedActionChipOn]}
+          onPress={() => reactToPost(feedPost, r.key)}
+        >
+          <Text style={{ fontSize: 15 }}>{r.emoji}</Text>
+          {!!counts[r.key] && <Text style={styles.feedActionCount}>{counts[r.key]}</Text>}
+        </TouchableOpacity>
+      ))}
+      <View style={{ flex: 1 }} />
+      <TouchableOpacity
+        style={styles.feedActionChip}
+        onPress={() => navigation.navigate('Comments', {
+          post: {
+            id: feedPost.id,
+            realAuthorId: feedPost.realAuthorId,
+            authorName: feedPost.authorName,
+            anonymous: feedPost.anonymous,
+            text: feedPost.text || '',
+          },
+        })}
+      >
+        <Ionicons name="chatbubble-outline" size={15} color={colors.inkSoft} />
+        <Text style={styles.feedActionCount}>{feedPost.commentsCount || 0}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 // Props: post, myId, onReact(key), onOpenComments, onOpenProfile, onSave, onDelete
 export function PostCard({ post, myId, onReact, onOpenComments, onOpenProfile, onSave, onDelete }) {
   const [picker, setPicker] = useState(false);
   const [showReactors, setShowReactors] = useState(false);
-  const { usersById } = useApp() || {};
+  const { usersById, awardStar, isAdmin, submitReport } = useApp() || {};
+  const [reportOpen, setReportOpen] = useState(false);
   const rx = reactionsOf(post);
   const myReaction = rx[myId] || null;
   const counts = {};
@@ -140,8 +253,12 @@ export function PostCard({ post, myId, onReact, onOpenComments, onOpenProfile, o
   const roleBadgeText = post.authorRole === 'teacher' ? 'Teacher'
     : post.authorRole === 'alumni' ? 'Alumni'
     : post.authorRole === 'student' ? 'Student' : '';
-  const sub = post.anonymous ? 'Identity hidden' : roleLabel;
-  const canVisit = !post.anonymous && onOpenProfile;
+  const realName = usersById?.[post.realAuthorId]?.name;
+  const sub = post.anonymous
+    ? (isAdmin && realName ? `Identity hidden · 🔍 ${realName}` : 'Identity hidden')
+    : roleLabel;
+  // Admin can tap through an anonymous post to the REAL profile.
+  const canVisit = (!post.anonymous || (isAdmin && post.realAuthorId)) && onOpenProfile;
 
   const confirmDelete = () =>
     Alert.alert('Delete post?', 'This removes it for everyone.', [
@@ -150,6 +267,19 @@ export function PostCard({ post, myId, onReact, onOpenComments, onOpenProfile, o
     ]);
 
   const pick = (key) => { setPicker(false); onReact(key); };
+
+  // Daily-star reward (Education & Jobs posts carry a star wallet).
+  const giveStar = async () => {
+    if (!awardStar) return;
+    const res = await awardStar({
+      targets: [{ coll: 'posts', id: post.id }, { coll: post.starColl, id: post.starDocId }],
+      toUserId: post.realAuthorId,
+    });
+    Alert.alert(res.ok ? '⭐ Star given!' : 'Stars',
+      res.ok
+        ? `You have ${res.left} star${res.left === 1 ? '' : 's'} left today. Stars can't be taken back.`
+        : res.msg);
+  };
 
   return (
     <View style={[styles.card, shadow.card]}>
@@ -184,6 +314,20 @@ export function PostCard({ post, myId, onReact, onOpenComments, onOpenProfile, o
           </View>
           <Text style={type.caption}>{sub} · {timeAgo(post.createdAt)}</Text>
         </View>
+        {!!post.starColl && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 6 }}>
+            <View style={styles.starPill}>
+              <Ionicons name="star" size={12} color={colors.accent} />
+              <Text style={styles.starPillText}>{post.stars || 0}</Text>
+            </View>
+            {!mine && (
+              <TouchableOpacity style={styles.starGiveBtn} onPress={giveStar}>
+                <Ionicons name="star-outline" size={13} color="#fff" />
+                <Text style={styles.starGiveBtnText}>+1</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
         {post.anonymous && (
           <View style={styles.anonBadge}>
             <Ionicons name="eye-off-outline" size={12} color={colors.anon} />
@@ -200,6 +344,10 @@ export function PostCard({ post, myId, onReact, onOpenComments, onOpenProfile, o
               : post.campusKind === 'lostfound' ? 'search'
               : post.campusKind === 'club' ? 'people'
               : post.campusKind === 'seminar' ? 'mic'
+              : post.campusKind === 'education' ? 'book'
+              : post.campusKind === 'jobs' ? 'briefcase'
+              : post.campusKind === 'review' ? 'star'
+              : post.campusKind === 'findfriends' ? 'heart'
               : 'ribbon'
             }
             size={12}
@@ -210,6 +358,10 @@ export function PostCard({ post, myId, onReact, onOpenComments, onOpenProfile, o
               : post.campusKind === 'lostfound' ? 'Lost & Found'
               : post.campusKind === 'club' ? 'Club'
               : post.campusKind === 'seminar' ? 'Seminar'
+              : post.campusKind === 'education' ? 'Education'
+              : post.campusKind === 'jobs' ? 'Jobs'
+              : post.campusKind === 'review' ? 'Faculty Review'
+              : post.campusKind === 'findfriends' ? 'Find Friends'
               : 'Alumni'}
           </Text>
         </View>
@@ -300,18 +452,25 @@ export function PostCard({ post, myId, onReact, onOpenComments, onOpenProfile, o
           </TouchableOpacity>
         )}
         <View style={{ flex: 1 }} />
-        {mine ? (
+        {(mine || isAdmin) && (
           <TouchableOpacity style={styles.action} onPress={confirmDelete}>
             <Ionicons name="trash-outline" size={16} color={colors.danger} />
             <Text style={[styles.actionText, { color: colors.danger }]}>Delete</Text>
           </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.action}>
+        )}
+        {!mine && (
+          <TouchableOpacity style={styles.action} onPress={() => setReportOpen(true)}>
             <Ionicons name="flag-outline" size={16} color={colors.inkSoft} />
             <Text style={styles.actionText}>Report</Text>
           </TouchableOpacity>
         )}
       </View>
+
+      <ReportModal
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        onSubmit={(reason, note) => submitReport(post, reason, note)}
+      />
     </View>
   );
 }
@@ -361,6 +520,58 @@ const styles = ThemedSheet(() => ({
     paddingHorizontal: 10, paddingVertical: 4, marginTop: spacing.md,
   },
   campusBadgeText: { fontSize: 11, fontWeight: '800', color: colors.primaryDark },
+  starPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: colors.bg, borderRadius: 999,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 1, borderColor: colors.line,
+  },
+  starPillText: { fontSize: 11.5, fontWeight: '800', color: colors.ink },
+  starGiveBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    backgroundColor: colors.accent, borderRadius: 999,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  starGiveBtnText: { fontSize: 10.5, fontWeight: '800', color: '#fff' },
+  reportDim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  reportSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: spacing.xl,
+  },
+  reportHandle: {
+    width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line,
+    alignSelf: 'center', marginBottom: spacing.md,
+  },
+  reportChip: {
+    borderRadius: 999, borderWidth: 1.5, borderColor: colors.line,
+    backgroundColor: colors.bg, paddingHorizontal: 11, paddingVertical: 7,
+  },
+  reportChipOn: { backgroundColor: colors.danger, borderColor: colors.danger },
+  reportChipText: { fontSize: 12.5, fontWeight: '800', color: colors.ink },
+  reportInput: {
+    backgroundColor: colors.bg, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.line,
+    paddingHorizontal: spacing.lg, paddingVertical: 11,
+    fontSize: 14.5, color: colors.ink, marginTop: spacing.md,
+    minHeight: 60, textAlignVertical: 'top',
+  },
+  reportBtn: {
+    backgroundColor: colors.danger, borderRadius: radius.md,
+    paddingVertical: 14, alignItems: 'center', marginTop: spacing.md,
+  },
+  feedActionsRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: spacing.sm, flexWrap: 'wrap',
+  },
+  feedActionChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: colors.bg, borderRadius: 999,
+    borderWidth: 1, borderColor: colors.line,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  feedActionChipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  feedActionCount: { fontSize: 11.5, fontWeight: '800', color: colors.inkSoft },
   reactorsBox: {
     position: 'absolute', left: spacing.xl, right: spacing.xl, top: '25%',
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.xl,

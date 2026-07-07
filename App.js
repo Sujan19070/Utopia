@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator , TouchableOpacity } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -15,6 +15,9 @@ import AuthScreen from './src/screens/AuthScreen';
 import VerifyEmailScreen from './src/screens/VerifyEmailScreen';
 import AnonymousScreen from './src/screens/AnonymousScreen';
 import FacultyReviewScreen from './src/screens/FacultyReviewScreen';
+import { EducationBoardScreen, JobsScreen, SpotlightScreen } from './src/screens/CampusBoardsScreens';
+import FindFriendsScreen from './src/screens/FindFriendsScreen';
+import { AdminReportsScreen, DeveloperScreen, FeedbackScreen } from './src/screens/AdminExtrasScreens';
 import FeedScreen from './src/screens/FeedScreen';
 import CreatePostScreen from './src/screens/CreatePostScreen';
 import CreateStoryScreen from './src/screens/CreateStoryScreen';
@@ -30,7 +33,7 @@ import UserProfileScreen from './src/screens/UserProfileScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import { ChatListScreen, ChatRoomScreen } from './src/screens/ChatScreens';
 import {
-  CampusHubScreen, SpotlightScreen, EducationScreen, JobsScreen,
+  CampusHubScreen,
 } from './src/screens/CampusScreens';
 import {
   EventsScreen, LostFoundScreen, AlumniScreen, ClubsScreen, SeminarsScreen,
@@ -74,7 +77,7 @@ function Tabs() {
 }
 
 function Root() {
-  const { user, booting } = useApp();
+  const { user, booting, banActive, signOut } = useApp();
   if (booting) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
@@ -84,6 +87,27 @@ function Root() {
   }
   if (!user) return <AuthScreen />;
   if (user.emailVerified === false) return <VerifyEmailScreen />;
+  if (banActive) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.primaryDark, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+        <Text style={{ fontSize: 44 }}>🚫</Text>
+        <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', marginTop: 12, textAlign: 'center' }}>
+          Account suspended
+        </Text>
+        <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, marginTop: 8, textAlign: 'center' }}>
+          {user.bannedUntil === 'forever'
+            ? 'This account has been permanently blocked for violating community rules.'
+            : `This account is blocked until ${new Date(user.bannedUntil).toLocaleString()}.`}
+        </Text>
+        <TouchableOpacity
+          onPress={signOut}
+          style={{ marginTop: 24, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 999, paddingHorizontal: 24, paddingVertical: 12 }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '800' }}>Sign out</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
   return (
     <View style={{ flex: 1 }}>
       {user.anon?.on && (
@@ -117,9 +141,13 @@ function Root() {
       <Stack.Screen name="LostFound" component={LostFoundScreen} />
       <Stack.Screen name="Alumni" component={AlumniScreen} />
       <Stack.Screen name="FacultyReview" component={FacultyReviewScreen} />
-      <Stack.Screen name="Spotlight" component={SpotlightScreen} />
-      <Stack.Screen name="Education" component={EducationScreen} />
+      <Stack.Screen name="Education" component={EducationBoardScreen} />
       <Stack.Screen name="Jobs" component={JobsScreen} />
+      <Stack.Screen name="Spotlight" component={SpotlightScreen} />
+      <Stack.Screen name="FindFriends" component={FindFriendsScreen} />
+      <Stack.Screen name="AdminReports" component={AdminReportsScreen} />
+      <Stack.Screen name="Developer" component={DeveloperScreen} />
+      <Stack.Screen name="Feedback" component={FeedbackScreen} />
     </Stack.Navigator>
     </View>
   );

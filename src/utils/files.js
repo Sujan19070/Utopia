@@ -7,18 +7,38 @@ import * as FS from 'expo-file-system';
 let LegacyFS = null;
 try { LegacyFS = require('expo-file-system/legacy'); } catch (e) {}
 
-// Read any local file as base64.
+// Read any local file as base64. Tries multiple strategies because
+// DocumentPicker cache files on some Android/Expo Go combos reject the
+// legacy read, and RN's fetch().blob() can't handle these URIs either.
 export async function readFileB64(uri) {
   const legacy = LegacyFS || FS;
+  // 1) legacy API (fastest when it works)
   if (typeof legacy.readAsStringAsync === 'function') {
-    return legacy.readAsStringAsync(uri, { encoding: 'base64' });
+    try {
+      return await legacy.readAsStringAsync(uri, { encoding: 'base64' });
+    } catch (e) { /* fall through */ }
   }
-  if (FS.File) {
-    const f = new FS.File(uri);
-    if (typeof f.base64 === 'function') return await f.base64();
-    if (typeof f.base64Sync === 'function') return f.base64Sync();
-  }
-  throw new Error('Cannot read file on this SDK — run: npx expo install expo-file-system');
+  // 2) new File API
+  try {
+    if (FS.File) {
+      const f = new FS.File(uri);
+      if (typeof f.base64 === 'function') return await f.base64();
+      if (typeof f.base64Sync === 'function') return f.base64Sync();
+    }
+  } catch (e) { /* fall through */ }
+  // 3) copy the picker-cache file to our own cache dir, then read that copy.
+  //    (The original content:// / picker URI is often the unreadable part.)
+  try {
+    const dir = (legacy.cacheDirectory) || (FS.cacheDirectory);
+    if (dir && typeof legacy.copyAsync === 'function' && typeof legacy.readAsStringAsync === 'function') {
+      const dest = dir + 'utopia_pick_' + Date.now();
+      await legacy.copyAsync({ from: uri, to: dest });
+      const b64 = await legacy.readAsStringAsync(dest, { encoding: 'base64' });
+      try { await legacy.deleteAsync(dest, { idempotent: true }); } catch (e) {}
+      return b64;
+    }
+  } catch (e) { /* fall through */ }
+  throw new Error('Could not read this file. Try picking it from a different folder (e.g. move it to Downloads first).');
 }
 
 // Write base64 to a cache file and return its uri (for playback/sharing).

@@ -5,10 +5,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing, type, shadow, ThemedSheet } from '../theme';
+import { useApp } from '../state/AppContext';
 import { Avatar, Chip, SectionHeader } from '../components/ui';
 import { SPOTLIGHT, COURSES, JOBS } from '../mock/data';
 
-// NOTE: Spotlight, Education and Jobs still show sample content in this build.
+// All campus sections are live and cross-post to the main feed.
 // They go live the same way the feed did (see GOLIVE.md, "What's next").
 
 const HUB = [
@@ -18,12 +19,15 @@ const HUB = [
   { key: 'LostFound', icon: 'search', title: 'Lost & Found', desc: 'Lost something on campus? Found something?', tone: '#B4654A', live: true },
   { key: 'Alumni', icon: 'ribbon', title: 'Alumni', desc: 'Graduates — guidance, referrals, connections', tone: '#4B3F72', live: true },
   { key: 'FacultyReview', icon: 'star', title: 'Faculty review', desc: 'Anonymous teacher & course reviews with ratings and CG', tone: '#B4832F', live: true },
-  { key: 'Spotlight', icon: 'sparkles', title: 'Campus Spotlight', desc: 'Weekly featured students — opt in and get votes', tone: colors.accent },
-  { key: 'Education', icon: 'book', title: 'Education', desc: 'Notes, past papers, study groups, workshops', tone: '#067D5A' },
-  { key: 'Jobs', icon: 'briefcase', title: 'Jobs & internships', desc: 'Part-time work, internships, campus gigs', tone: '#4A6FB4' },
+  { key: 'FindFriends', icon: 'heart', title: 'Find friends', desc: 'Post it, ask it & confess it — crush, coffee adda, study partners', tone: '#D64545', live: true },
+  { key: 'AdminReports', icon: 'flag', title: 'Reports', desc: 'Admin only — reported posts, delete & block users', tone: '#8B2E2E', live: true, adminOnly: true },
+  { key: 'Spotlight', icon: 'sparkles', title: 'Campus Spotlight', desc: 'Star ranking — Campus Star & Helper of the week', tone: colors.accent, live: true },
+  { key: 'Education', icon: 'book', title: 'Education', desc: 'Notes, PDFs, slides & sheets — earn ⭐ stars', tone: '#067D5A', live: true },
+  { key: 'Jobs', icon: 'briefcase', title: 'Jobs & internships', desc: 'Part-time work, internships, gigs — earn ⭐ stars', tone: '#4A6FB4', live: true },
 ];
 
 export function CampusHubScreen({ navigation }) {
+  const { isAdmin } = useApp();
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <View style={{ padding: spacing.lg }}>
@@ -31,7 +35,7 @@ export function CampusHubScreen({ navigation }) {
         <Text style={type.caption}>Everything beyond the feed</Text>
       </View>
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-      {HUB.map((h) => (
+      {HUB.filter((h) => !h.adminOnly || isAdmin).map((h) => (
         <TouchableOpacity
           key={h.key}
           style={[styles.hubCard, shadow.card]}
@@ -48,7 +52,7 @@ export function CampusHubScreen({ navigation }) {
         </TouchableOpacity>
       ))}
       <Text style={[type.caption, { padding: spacing.lg, textAlign: 'center' }]}>
-        Spotlight, Education and Jobs show sample content in this test build.
+        Everything here posts to the main feed too — react and comment there.
       </Text>
       </ScrollView>
     </SafeAreaView>

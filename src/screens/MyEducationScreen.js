@@ -45,7 +45,11 @@ export default function MyEducationScreen({ navigation }) {
   const [vMsg, setVMsg] = useState('');
 
   // Is the currently picked role already verified for this account?
-  const roleActive = user.roleVerified && user.role === f.role;
+  // Verified students & alumni can switch between those two roles freely —
+  // same person, same verified university email.
+  const FLEX = ['student', 'alumni'];
+  const roleActive = user.roleVerified && (user.role === f.role ||
+    (FLEX.includes(user.role) && FLEX.includes(f.role)));
   const needsVerify = !roleActive;
 
   const sendVerify = async () => {
@@ -128,6 +132,11 @@ export default function MyEducationScreen({ navigation }) {
               );
             })}
           </View>
+          {user.roleVerified && FLEX.includes(user.role) && (
+            <Text style={[type.caption, { marginTop: -6, marginBottom: spacing.md }]}>
+              ✓ Verified {user.role}s can switch between Student and Alumni without re-verifying.
+            </Text>
+          )}
 
           <View style={styles.verifyBox}>
               {roleActive ? (

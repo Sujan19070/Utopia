@@ -143,6 +143,7 @@ export function AppProvider({ children }) {
     message: (n) => n.preview || 'sent you a message',
     story_reaction: (n) => `reacted ${n.emoji || ''} to your story`,
     story_reply: (n) => `replied to your story: "${n.preview || ''}"`,
+    star: () => 'gave your post a ⭐ star',
   };
 
   const fireLocal = async (n) => {
@@ -565,11 +566,18 @@ export function AppProvider({ children }) {
     // Student is the default role and always works, verified or not.
     // Teacher/Alumni only take effect once verified. Any role KEEPS its
     // verified badge if it's already verified for that same role.
+    // Student <-> Alumni are interchangeable once verified (you graduate,
+    // you come back to study — same person, same university email).
+    const flexPair = ['student', 'alumni'];
+    const flexSwitch = user.roleVerified &&
+      flexPair.includes(user.role) && flexPair.includes(requested);
     const canSetRole =
-      requested === 'student' || (user.roleVerified && user.role === requested);
-    // Switching to a role you haven't verified drops the badge; keeping the
-    // same role (or re-selecting an already-verified one) preserves it.
-    const keepVerified = user.roleVerified && user.role === requested;
+      requested === 'student' || flexSwitch ||
+      (user.roleVerified && user.role === requested);
+    // Switching keeps the badge if it's the same verified role OR a
+    // student<->alumni switch; anything else drops it.
+    const keepVerified = user.roleVerified &&
+      (user.role === requested || flexSwitch);
     return updateDoc(doc(db, 'users', user.id), {
       university: f.university || '',
       college: f.college || '',
@@ -678,20 +686,81 @@ export function AppProvider({ children }) {
     });
   };
 
+  // ---- daily star rewards ----
+  // Everyone generates 2 stars per day to give away on Education & Jobs
+  // posts. Stars can't be taken back. Totals decide the Campus Spotlight.
+  const dateKey = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const weekKeyNow = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back to Monday
+    return `w-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const starsLeftToday = () =>
+    (user?.starDate === dateKey() ? (user.starsLeft ?? 0) : 2);
+
+  // Account suspension: bannedUntil is 'forever' or a millisecond timestamp.
+  const banActive = !!user && (
+    user.bannedUntil === 'forever' ||
+    (typeof user.bannedUntil === 'number' && user.bannedUntil > Date.now())
+  );
+
+  // Developer/admin account: sees behind every anonymous identity in-app.
+  const ADMIN_EMAIL = 'sujanofficial19070@gmail.com';
+  const isAdmin = ((user?.email || '').toLowerCase() === ADMIN_EMAIL);
+
+  const awardStar = async ({ coll, id, targets, toUserId }) => {
+    if (!user) return { ok: false, msg: 'Not signed in.' };
+    if (toUserId === user.id) return { ok: false, msg: "You can't star your own post." };
+    const left = starsLeftToday();
+    if (left <= 0) {
+      return { ok: false, msg: 'No stars left today — you get 2 fresh stars every day.' };
+    }
+    await updateDoc(doc(db, 'users', user.id), { starsLeft: left - 1, starDate: dateKey() });
+    // A star can live on more than one doc (the section post + its feed copy).
+    const tgts = targets || [{ coll, id }];
+    for (const t of tgts) {
+      try {
+        await updateDoc(doc(db, t.coll, t.id), {
+          stars: increment(1), [`starsBy.${user.id}`]: increment(1),
+        });
+      } catch (e) { /* one copy may be deleted — fine */ }
+    }
+    const wk = weekKeyNow();
+    const rSnap = await getDoc(doc(db, 'users', toUserId));
+    const r = rSnap.exists() ? rSnap.data() : {};
+    await updateDoc(doc(db, 'users', toUserId), {
+      starsReceived: increment(1),
+      ...(r.starsWeekKey === wk
+        ? { starsWeek: increment(1) }
+        : { starsWeek: 1, starsWeekKey: wk }),
+    });
+    notify(toUserId, 'star', { preview: '⭐ gave your post a star' });
+    return { ok: true, left: left - 1 };
+  };
+
   // Campus sections (Events, Lost & Found, Clubs, Seminars, Alumni) also
   // appear in the main feed as normal posts — so people can react & comment.
   // `campusKind` tags them so the feed shows a labelled badge.
-  const crossPostToFeed = async ({ campusKind, title, text, imageB64 }) => {
-    await addDoc(collection(db, 'posts'), {
+  const crossPostToFeed = async ({ campusKind, title, text, imageB64, anonymous, starColl, starDocId }) => {
+    const ref = await addDoc(collection(db, 'posts'), {
       text: text || '',
-      campusKind: campusKind || null,      // 'event' | 'lostfound' | 'club' | 'seminar' | 'alumni'
+      campusKind: campusKind || null,      // event | lostfound | club | seminar | alumni | education | jobs | review
       campusTitle: title || '',
-      anonymous: false,
-      authorName: user.name,
-      authorDept: user.dept,
-      authorRole: user.roleVerified ? (user.role || 'student') : null,
-      authorSubject: user.roleVerified ? (user.subject || '') : '',
+      anonymous: !!anonymous,
+      authorName: anonymous ? null : user.name,
+      anonName: anonymous ? 'Anonymous' : null,
+      anonAvatar: anonymous ? '🎭' : null,
+      authorDept: anonymous ? null : user.dept,
+      authorRole: !anonymous && user.roleVerified ? (user.role || 'student') : null,
+      authorSubject: !anonymous && user.roleVerified ? (user.subject || '') : '',
       realAuthorId: user.id,
+      starColl: starColl || null,
+      starDocId: starDocId || null,
+      stars: 0,
+      starsBy: {},
       imageB64: imageB64 || null,
       reactions: {},
       likedBy: [],
@@ -699,6 +768,7 @@ export function AppProvider({ children }) {
       commentsCount: 0,
       createdAt: serverTimestamp(),
     });
+    return ref.id;
   };
 
   const reactToPost = async (post, key) => {
@@ -727,8 +797,30 @@ export function AppProvider({ children }) {
   };
 
   const deletePost = async (post) => {
-    if (post.realAuthorId !== user.id) return;
+    if (post.realAuthorId !== user.id && !isAdmin) return;
     await deleteDoc(doc(db, 'posts', post.id));
+    // If it's a linked campus post, remove the section copy too (admin cleanup).
+    if (isAdmin && post.starColl && post.starDocId) {
+      try { await deleteDoc(doc(db, post.starColl, post.starDocId)); } catch (e) {}
+    }
+  };
+
+  // ---- reports ----
+  const submitReport = async (post, reason, note) => {
+    await addDoc(collection(db, 'reports'), {
+      postId: post.id,
+      postText: (post.text || '').slice(0, 200),
+      campusKind: post.campusKind || null,
+      starColl: post.starColl || null,
+      starDocId: post.starDocId || null,
+      reportedUserId: post.realAuthorId || null,
+      reporterId: user.id,
+      reporterName: user.name,
+      reason,
+      note: (note || '').trim(),
+      status: 'open',
+      createdAt: serverTimestamp(),
+    });
   };
 
   // ---- comments ----
@@ -784,6 +876,7 @@ export function AppProvider({ children }) {
       signInWithGoogle, resetPassword, resendVerification, refreshVerification,
       directory, usersById,
       posts, addPost, crossPostToFeed, reactToPost, toggleSave, deletePost,
+      awardStar, starsLeftToday, isAdmin, banActive, submitReport,
       stories, addStory, deleteStory, reactToStory, replyToStory,
       addComment, voteComment,
       saveAccount, updateProfilePhoto, setMyLocation,

@@ -16,6 +16,7 @@ const META = {
   message: { icon: 'chatbubble-ellipses', color: colors.primary, text: () => 'sent you a message' },
   story_reaction: { icon: 'heart', color: colors.danger, text: (n) => `reacted ${n.emoji || ''} to your story` },
   story_reply: { icon: 'return-down-forward', color: colors.primary, text: () => 'replied to your story' },
+  star: { icon: 'star', color: colors.accent, text: () => 'gave your post a ⭐ star' },
 };
 
 export default function NotificationsScreen({ navigation }) {

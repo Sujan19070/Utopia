@@ -31,7 +31,7 @@ function haversine(a, b) {
 const EMPTY_FILTERS = { university: '', hometown: '', area: '', college: '' };
 
 export default function DiscoverScreen({ navigation }) {
-  const { user, directory, sendFriendRequest, respondFriendRequest, setMyLocation, isBlockedEither } = useApp();
+  const { user, directory, sendFriendRequest, respondFriendRequest, setMyLocation, isBlockedEither , isAdmin, usersById } = useApp();
   const [tab, setTab] = useState('near'); // 'near' | 'people' | 'friends' | 'anon'
   const [reqs, setReqs] = useState([]);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -206,19 +206,27 @@ export default function DiscoverScreen({ navigation }) {
   // anonymous chat thread on the recipient's side).
   const AnonRow = ({ a }) => (
     <View style={[styles.card, shadow.card]}>
-      <View style={{
-        width: 50, height: 50, borderRadius: 25,
-        backgroundColor: a.color, alignItems: 'center', justifyContent: 'center',
-      }}>
+      <TouchableOpacity
+        disabled={!isAdmin}
+        onPress={() => navigation.navigate('UserProfile', { userId: a.id, name: usersById?.[a.id]?.name })}
+        style={{
+          width: 50, height: 50, borderRadius: 25,
+          backgroundColor: a.color, alignItems: 'center', justifyContent: 'center',
+        }}>
         <Text style={{ fontSize: 24 }}>{a.emoji}</Text>
-      </View>
-      <View style={{ flex: 1, marginLeft: spacing.md }}>
+      </TouchableOpacity>
+      <TouchableOpacity
+        disabled={!isAdmin}
+        onPress={() => navigation.navigate('UserProfile', { userId: a.id, name: usersById?.[a.id]?.name })}
+        style={{ flex: 1, marginLeft: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text style={{ ...type.body, fontWeight: '700' }}>{a.nick}</Text>
           <Text style={{ fontSize: 12 }}>🎭</Text>
         </View>
-        <Text style={type.caption}>Anonymous · anyone can message</Text>
-      </View>
+        <Text style={type.caption}>
+          {isAdmin ? `🔍 ${usersById?.[a.id]?.name || a.id} · tap to open` : 'Anonymous · anyone can message'}
+        </Text>
+      </TouchableOpacity>
       <TouchableOpacity
         style={[styles.primaryBtn, { backgroundColor: colors.anon }]}
         onPress={() => navigation.navigate('ChatRoom', {

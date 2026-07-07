@@ -30,13 +30,13 @@ function MentionText({ text, mentions }) {
 }
 
 function CommentRow({ postId, comment, isReply, myId, onProfile, onReply }) {
-  const { voteComment } = useApp();
+  const { voteComment , isAdmin } = useApp();
   const likes = comment.likes || [];
   const dislikes = comment.dislikes || [];
   return (
     <View style={[styles.commentRow, isReply && styles.replyRow]}>
       <TouchableOpacity
-        disabled={!!comment.anonymous}
+        disabled={!!comment.anonymous && !isAdmin}
         onPress={() => onProfile(comment.authorId, comment.authorName)}
       >
         <Avatar
@@ -50,11 +50,11 @@ function CommentRow({ postId, comment, isReply, myId, onProfile, onReply }) {
       <View style={{ flex: 1, marginLeft: spacing.sm }}>
         <View style={styles.bubbleC}>
           <TouchableOpacity
-            disabled={!!comment.anonymous}
+            disabled={!!comment.anonymous && !isAdmin}
             onPress={() => onProfile(comment.authorId, comment.authorName)}
           >
             <Text style={{ ...type.caption, fontWeight: '800', color: colors.ink }}>
-              {comment.anonymous ? (comment.anonName || 'Anonymous') : comment.authorName}{comment.authorId === myId ? ' (you)' : ''}
+              {comment.anonymous ? (comment.anonName || 'Anonymous') : comment.authorName}{comment.authorId === myId ? ' (you)' : ''}{comment.anonymous && isAdmin ? ` 🔍 ${comment.authorName}` : ''}
             </Text>
           </TouchableOpacity>
           <MentionText text={comment.text} mentions={comment.mentions} />

@@ -21,8 +21,22 @@ const FILTER_FIELDS = [
   { key: 'school', label: 'School' },
   { key: 'area', label: 'Area' },
 ];
-const EMPTY = { university: '', hometown: '', college: '', school: '', area: '' };
+const EMPTY = { university: '', hometown: '', college: '', school: '', area: '', kind: '' };
 const norm = (s) => (s || '').trim().toLowerCase();
+
+// Section filter chips — every campus section that cross-posts to the feed.
+const KIND_FILTERS = [
+  { key: 'regular', label: '📝 Posts' },
+  { key: 'findfriends', label: '❤️ Find Friends' },
+  { key: 'education', label: '📚 Education' },
+  { key: 'jobs', label: '💼 Jobs' },
+  { key: 'review', label: '⭐ Faculty Review' },
+  { key: 'event', label: '📅 Events' },
+  { key: 'seminar', label: '🎤 Seminars' },
+  { key: 'club', label: '👥 Clubs' },
+  { key: 'lostfound', label: '🔍 Lost & Found' },
+  { key: 'alumni', label: '🎓 Alumni' },
+];
 
 function StoriesRow({ navigation }) {
   const { user, stories, isBlockedEither } = useApp();
@@ -94,6 +108,8 @@ function FilterModal({ visible, onClose, filters, setFilters }) {
           Pick any values to see matching posts. Anonymous posts always stay visible.
         </Text>
 
+        <SelectField label="Post types" value={(KIND_FILTERS.find((k) => k.key === filters.kind) || {}).label || ''}
+          placeholder="All post types" onPress={() => setPicker('kind')} />
         <SelectField label="University" value={filters.university}
           placeholder="Any university" onPress={() => setPicker('university')} />
         <SelectField label="Hometown (zila / upazila)" value={filters.hometown}
@@ -115,6 +131,10 @@ function FilterModal({ visible, onClose, filters, setFilters }) {
         </View>
       </View>
 
+      <SearchPickerModal visible={picker === 'kind'} title="Post types"
+        items={KIND_FILTERS.map((k) => k.label)} current={(KIND_FILTERS.find((k) => k.key === filters.kind) || {}).label || ''}
+        onPick={(label) => set('kind', (KIND_FILTERS.find((k) => k.label === label) || {}).key || '')}
+        onClose={() => setPicker(null)} />
       <SearchPickerModal visible={picker === 'university'} title="Filter by university"
         items={[...UNIVERSITIES, ...MEDICAL_COLLEGES].sort((a, b) => a.localeCompare(b))} current={filters.university}
         onPick={(v) => set('university', v)} onClose={() => setPicker(null)} allowCustom />
@@ -161,9 +181,15 @@ export default function FeedScreen({ navigation }) {
   // anonymous posts always pass (so filters can't unmask anyone).
   const visiblePosts = useMemo(() => {
     if (!posts) return posts;
-    const base = posts.filter(
+    let base = posts.filter(
       (p) => p.anonymous || !isBlockedEither(p.realAuthorId)
     );
+    // Post-type filter: 'regular' = normal posts, otherwise match the campus kind.
+    if (filters.kind) {
+      base = base.filter((p) =>
+        filters.kind === 'regular' ? !p.campusKind : p.campusKind === filters.kind
+      );
+    }
     if (active.length === 0) return base;
     return base.filter((p) => {
       if (p.anonymous) return true;
@@ -173,7 +199,9 @@ export default function FeedScreen({ navigation }) {
     });
   }, [posts, filters, usersById]);
 
-  const filterLabels = active.map((ff) => filters[ff.key]).join(', ');
+  const kindLabel = (KIND_FILTERS.find((k) => k.key === filters.kind) || {}).label || '';
+  const filterLabels = [kindLabel, ...active.map((ff) => filters[ff.key])].filter(Boolean).join(', ');
+  const anyFilter = active.length > 0 || !!filters.kind;
 
   const openComments = (post) =>
     navigation.navigate('Comments', {
@@ -193,13 +221,13 @@ export default function FeedScreen({ navigation }) {
     <SafeAreaView style={styles.root} edges={['top']}>
       <View style={styles.header}>
         <View>
-          <Text style={type.display}>Campus feed</Text>
+          <Text style={type.display}>Feed</Text>
           <Text style={type.caption}>Live — everyone on Utopia sees this</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           <TouchableOpacity style={styles.roundBtn} onPress={() => setFilterOpen(true)}>
             <Ionicons name="funnel-outline" size={20} color={colors.primaryDark} />
-            {active.length > 0 && <View style={styles.dot} />}
+            {anyFilter && <View style={styles.dot} />}
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.roundBtn}
@@ -218,13 +246,13 @@ export default function FeedScreen({ navigation }) {
         </View>
       </View>
 
-      {active.length > 0 && (
+      {anyFilter && (
         <View style={styles.filterBar}>
           <Ionicons name="funnel" size={13} color={colors.primaryDark} />
           <Text style={styles.filterBarText} numberOfLines={1}>
             Filtered: {filterLabels}
           </Text>
-          <TouchableOpacity onPress={() => setFilters(EMPTY)}>
+          <TouchableOpacity onPress={() => setFilters((prev) => ({ ...EMPTY, __distinct: prev.__distinct }))}>
             <Text style={{ color: colors.danger, fontWeight: '800', fontSize: 12.5 }}>Clear</Text>
           </TouchableOpacity>
         </View>

@@ -12,8 +12,17 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { colors, radius, spacing, type, shadow, ThemedSheet } from '../theme';
-import { Avatar, Chip, timeAgo } from '../components/ui';
+import { Avatar, Chip, timeAgo , FeedActions } from '../components/ui';
 import { useApp } from '../state/AppContext';
+
+// Confirm-and-delete for the author of any campus item.
+const ownerDelete = (coll, id, what) =>
+  Alert.alert(`Delete ${what}?`, 'This removes it for everyone and cannot be undone.', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Delete', style: 'destructive', onPress: () => deleteDoc(doc(db, coll, id)) },
+  ]);
+
+
 import { smartCompress } from '../utils/image';
 
 // ---------- shared bits ----------
@@ -74,7 +83,7 @@ const useCol = (name) => {
 const EVENT_KINDS = ['Club event', 'Seminar', 'Research lecture', 'Workshop'];
 
 export function EventsScreen({ navigation }) {
-  const { user, crossPostToFeed } = useApp();
+  const { user, crossPostToFeed, isAdmin } = useApp();
   const events = useCol('events');
   const [filter, setFilter] = useState('All');
   const [open, setOpen] = useState(false);
@@ -90,15 +99,16 @@ export function EventsScreen({ navigation }) {
     }
     setBusy(true);
     try {
-      await addDoc(collection(db, 'events'), {
+      const secRef = await addDoc(collection(db, 'events'), {
         ...f, title: f.title.trim(),
         authorId: user.id, authorName: user.name,
         interested: [], createdAt: serverTimestamp(),
       });
-      await crossPostToFeed({
+      const feedId = await crossPostToFeed({
         campusKind: 'event', title: f.title.trim(),
         text: `📅 ${f.kind}: ${f.title.trim()}\n${f.date}${f.venue ? ' · ' + f.venue : ''}${f.details ? '\n\n' + f.details : ''}`,
       });
+      await updateDoc(secRef, { feedPostId: feedId });
       setOpen(false);
       setF({ kind: EVENT_KINDS[0], title: '', date: '', venue: '', details: '' });
     } finally { setBusy(false); }
@@ -158,6 +168,11 @@ export function EventsScreen({ navigation }) {
                   <Avatar userId={item.authorId} name={item.authorName} size={24} />
                   <Text style={type.caption}>{item.authorName}</Text>
                 </TouchableOpacity>
+                {(item.authorId === user.id || isAdmin) && (
+                  <TouchableOpacity onPress={() => ownerDelete('events', item.id, 'this event')} style={{ padding: 4 }}>
+                    <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={[styles.interestBtn, going && { backgroundColor: colors.primary }]}
                   onPress={() => toggleInterest(item)}
@@ -168,6 +183,7 @@ export function EventsScreen({ navigation }) {
                   </Text>
                 </TouchableOpacity>
               </View>
+              <FeedActions feedPostId={item.feedPostId} navigation={navigation} />
             </View>
           );
         }}
@@ -192,7 +208,7 @@ export function EventsScreen({ navigation }) {
 
 // ================= LOST & FOUND =================
 export function LostFoundScreen({ navigation }) {
-  const { user, crossPostToFeed } = useApp();
+  const { user, crossPostToFeed, isAdmin } = useApp();
   const items = useCol('lostfound');
   const [filter, setFilter] = useState('All');
   const [open, setOpen] = useState(false);
@@ -224,16 +240,17 @@ export function LostFoundScreen({ navigation }) {
     if (!f.title.trim()) { Alert.alert('Missing info', 'Describe the item.'); return; }
     setBusy(true);
     try {
-      await addDoc(collection(db, 'lostfound'), {
+      const secRef = await addDoc(collection(db, 'lostfound'), {
         ...f, title: f.title.trim(),
         imageB64: imageB64 || null, resolved: false,
         authorId: user.id, authorName: user.name, createdAt: serverTimestamp(),
       });
-      await crossPostToFeed({
+      const feedId = await crossPostToFeed({
         campusKind: 'lostfound', title: f.title.trim(),
         text: `${f.kind === 'lost' ? '🔍 LOST' : '📦 FOUND'}: ${f.title.trim()}${f.place ? '\n📍 ' + f.place : ''}${f.details ? '\n\n' + f.details : ''}`,
         imageB64: imageB64 || null,
       });
+      await updateDoc(secRef, { feedPostId: feedId });
       setOpen(false);
       setF({ kind: 'lost', title: '', details: '', place: '' });
       setImageB64(null);
@@ -295,20 +312,21 @@ export function LostFoundScreen({ navigation }) {
                 <Avatar userId={item.authorId} name={item.authorName} size={24} />
                 <Text style={type.caption}>{item.authorName}</Text>
               </TouchableOpacity>
-              {item.authorId === user.id ? (
-                !item.resolved ? (
-                  <TouchableOpacity
-                    style={styles.interestBtn}
-                    onPress={() => updateDoc(doc(db, 'lostfound', item.id), { resolved: true })}
-                  >
-                    <Ionicons name="checkmark" size={14} color={colors.primary} />
-                    <Text style={{ fontWeight: '800', fontSize: 12.5, color: colors.primary }}>Mark resolved</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity onPress={() => deleteDoc(doc(db, 'lostfound', item.id))}>
+              {(item.authorId === user.id || isAdmin) ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  {!item.resolved && (
+                    <TouchableOpacity
+                      style={styles.interestBtn}
+                      onPress={() => updateDoc(doc(db, 'lostfound', item.id), { resolved: true })}
+                    >
+                      <Ionicons name="checkmark" size={14} color={colors.primary} />
+                      <Text style={{ fontWeight: '800', fontSize: 12.5, color: colors.primary }}>Mark resolved</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity onPress={() => ownerDelete('lostfound', item.id, 'this item')}>
                     <Ionicons name="trash-outline" size={17} color={colors.danger} />
                   </TouchableOpacity>
-                )
+                </View>
               ) : (
                 <TouchableOpacity
                   style={[styles.interestBtn, { backgroundColor: colors.primary }]}
@@ -319,6 +337,7 @@ export function LostFoundScreen({ navigation }) {
                 </TouchableOpacity>
               )}
             </View>
+              <FeedActions feedPostId={item.feedPostId} navigation={navigation} />
           </View>
         )}
       />
@@ -346,7 +365,7 @@ export function LostFoundScreen({ navigation }) {
 
 // ================= ALUMNI =================
 export function AlumniScreen({ navigation }) {
-  const { user, crossPostToFeed } = useApp();
+  const { user, crossPostToFeed, isAdmin } = useApp();
   const alumni = useCol('alumni');
   const [open, setOpen] = useState(false);
   const mine = useMemo(() => alumni.find((a) => a.id === user.id), [alumni, user.id]);
@@ -372,10 +391,11 @@ export function AlumniScreen({ navigation }) {
         createdAt: mine?.createdAt || serverTimestamp(),
       });
       if (!wasListed) {
-        await crossPostToFeed({
+        const feedId = await crossPostToFeed({
           campusKind: 'alumni', title: f.batch.trim(),
           text: `🎓 Joined Alumni · Batch ${f.batch.trim()}${(f.role || f.org) ? '\n' + [f.role, f.org].filter(Boolean).join(' @ ') : ''}${f.note ? '\n\n' + f.note : ''}`,
         });
+        await updateDoc(doc(db, 'alumni', user.id), { feedPostId: feedId });
       }
       setOpen(false);
     } finally { setBusy(false); }
@@ -430,6 +450,7 @@ export function AlumniScreen({ navigation }) {
                 </TouchableOpacity>
               )}
             </View>
+              <FeedActions feedPostId={item.feedPostId} navigation={navigation} />
             {!!item.note && <Text style={[type.body, { marginTop: spacing.sm }]}>{item.note}</Text>}
           </View>
         )}
@@ -450,7 +471,7 @@ export function AlumniScreen({ navigation }) {
 
 // ================= CLUBS =================
 export function ClubsScreen({ navigation }) {
-  const { user, crossPostToFeed } = useApp();
+  const { user, crossPostToFeed, isAdmin } = useApp();
   const clubs = useCol('clubs');
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ name: '', tagline: '', about: '' });
@@ -460,16 +481,17 @@ export function ClubsScreen({ navigation }) {
     if (!f.name.trim()) { Alert.alert('Missing info', 'Give your club a name.'); return; }
     setBusy(true);
     try {
-      await addDoc(collection(db, 'clubs'), {
+      const secRef = await addDoc(collection(db, 'clubs'), {
         ...f, name: f.name.trim(),
         members: [user.id],
         authorId: user.id, authorName: user.name,
         createdAt: serverTimestamp(),
       });
-      await crossPostToFeed({
+      const feedId = await crossPostToFeed({
         campusKind: 'club', title: f.name.trim(),
         text: `👥 New club: ${f.name.trim()}${f.tagline ? '\n' + f.tagline : ''}${f.about ? '\n\n' + f.about : ''}`,
       });
+      await updateDoc(secRef, { feedPostId: feedId });
       setOpen(false);
       setF({ name: '', tagline: '', about: '' });
     } finally { setBusy(false); }
@@ -524,6 +546,11 @@ export function ClubsScreen({ navigation }) {
                     {item.authorName} · {(item.members || []).length} member{(item.members || []).length === 1 ? '' : 's'}
                   </Text>
                 </TouchableOpacity>
+                {(item.authorId === user.id || isAdmin) && (
+                  <TouchableOpacity onPress={() => ownerDelete('clubs', item.id, 'this club')} style={{ padding: 4 }}>
+                    <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={[styles.interestBtn, inClub && { backgroundColor: colors.primary }]}
                   onPress={() => toggleJoin(item)}
@@ -538,6 +565,7 @@ export function ClubsScreen({ navigation }) {
                   </Text>
                 </TouchableOpacity>
               </View>
+              <FeedActions feedPostId={item.feedPostId} navigation={navigation} />
             </View>
           );
         }}
@@ -556,7 +584,7 @@ export function ClubsScreen({ navigation }) {
 
 // ================= SEMINARS =================
 export function SeminarsScreen({ navigation }) {
-  const { user, crossPostToFeed } = useApp();
+  const { user, crossPostToFeed, isAdmin } = useApp();
   const seminars = useCol('seminars');
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ title: '', speaker: '', date: '', venue: '', details: '' });
@@ -569,16 +597,17 @@ export function SeminarsScreen({ navigation }) {
     }
     setBusy(true);
     try {
-      await addDoc(collection(db, 'seminars'), {
+      const secRef = await addDoc(collection(db, 'seminars'), {
         ...f, title: f.title.trim(),
         interested: [],
         authorId: user.id, authorName: user.name,
         createdAt: serverTimestamp(),
       });
-      await crossPostToFeed({
+      const feedId = await crossPostToFeed({
         campusKind: 'seminar', title: f.title.trim(),
         text: `🎤 Seminar: ${f.title.trim()}${f.speaker ? '\nSpeaker: ' + f.speaker : ''}\n${f.date}${f.venue ? ' · ' + f.venue : ''}${f.details ? '\n\n' + f.details : ''}`,
       });
+      await updateDoc(secRef, { feedPostId: feedId });
       setOpen(false);
       setF({ title: '', speaker: '', date: '', venue: '', details: '' });
     } finally { setBusy(false); }
@@ -636,6 +665,11 @@ export function SeminarsScreen({ navigation }) {
                   <Avatar userId={item.authorId} name={item.authorName} size={24} />
                   <Text style={type.caption}>{item.authorName}</Text>
                 </TouchableOpacity>
+                {(item.authorId === user.id || isAdmin) && (
+                  <TouchableOpacity onPress={() => ownerDelete('seminars', item.id, 'this seminar')} style={{ padding: 4 }}>
+                    <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={[styles.interestBtn, going && { backgroundColor: colors.primary }]}
                   onPress={() => toggleInterest(item)}
@@ -646,6 +680,7 @@ export function SeminarsScreen({ navigation }) {
                   </Text>
                 </TouchableOpacity>
               </View>
+              <FeedActions feedPostId={item.feedPostId} navigation={navigation} />
             </View>
           );
         }}
