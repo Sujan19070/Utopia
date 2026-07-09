@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ActivityIndicator , TouchableOpacity } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import * as Font from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppProvider, useApp } from './src/state/AppContext';
@@ -178,6 +179,27 @@ function ThemedApp() {
 }
 
 export default function App() {
+  // Preload the Ionicons font before rendering. On web the icon font isn't
+  // guaranteed to be ready at first paint, which makes every icon show as an
+  // empty box; waiting for it fixes that. On native it loads instantly.
+  const [fontsReady, setFontsReady] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    Font.loadAsync(Ionicons.font)
+      .catch(() => {})            // never block the app if the font call fails
+      .finally(() => { if (alive) setFontsReady(true); });
+    return () => { alive = false; };
+  }, []);
+
+  if (!fontsReady) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <AppProvider>

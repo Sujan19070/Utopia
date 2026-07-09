@@ -203,7 +203,7 @@ export function EducationBoardScreen({ navigation }) {
           <Ionicons name="open-outline" size={18} color={colors.primary} />
         </TouchableOpacity>
       )}
-      <FeedActions feedPostId={it.feedPostId} navigation={navigation} />
+      <FeedActions feedPostId={it.feedPostId} fallback={{ kind: 'education', authorId: it.authorId, title: it.title }} navigation={navigation} />
     </View>
   );
 
@@ -370,7 +370,7 @@ export function JobsScreen({ navigation }) {
           <Text selectable style={[type.body, { marginTop: 4 }]}>{it.apply}</Text>
         </View>
       )}
-      <FeedActions feedPostId={it.feedPostId} navigation={navigation} />
+      <FeedActions feedPostId={it.feedPostId} fallback={{ kind: 'jobs', authorId: it.authorId, title: it.title }} navigation={navigation} />
     </View>
   );
 

@@ -289,7 +289,7 @@ export default function FeedScreen({ navigation }) {
               onDelete={() => deletePost(item)}
             />
           )}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: 100, width: '100%', maxWidth: 640, alignSelf: 'center' }}
           showsVerticalScrollIndicator={false}
         />
       )}

@@ -183,7 +183,7 @@ export function EventsScreen({ navigation }) {
                   </Text>
                 </TouchableOpacity>
               </View>
-              <FeedActions feedPostId={item.feedPostId} navigation={navigation} />
+              <FeedActions feedPostId={item.feedPostId} fallback={{ kind: 'event', authorId: item.authorId, title: item.title }} navigation={navigation} />
             </View>
           );
         }}
@@ -337,7 +337,7 @@ export function LostFoundScreen({ navigation }) {
                 </TouchableOpacity>
               )}
             </View>
-              <FeedActions feedPostId={item.feedPostId} navigation={navigation} />
+              <FeedActions feedPostId={item.feedPostId} fallback={{ kind: 'lostfound', authorId: item.authorId, title: item.title }} navigation={navigation} />
           </View>
         )}
       />
@@ -450,7 +450,7 @@ export function AlumniScreen({ navigation }) {
                 </TouchableOpacity>
               )}
             </View>
-              <FeedActions feedPostId={item.feedPostId} navigation={navigation} />
+              <FeedActions feedPostId={item.feedPostId} fallback={{ kind: 'alumni', authorId: item.authorId, title: item.batch }} navigation={navigation} />
             {!!item.note && <Text style={[type.body, { marginTop: spacing.sm }]}>{item.note}</Text>}
           </View>
         )}
@@ -565,7 +565,7 @@ export function ClubsScreen({ navigation }) {
                   </Text>
                 </TouchableOpacity>
               </View>
-              <FeedActions feedPostId={item.feedPostId} navigation={navigation} />
+              <FeedActions feedPostId={item.feedPostId} fallback={{ kind: 'club', authorId: item.authorId, title: item.name }} navigation={navigation} />
             </View>
           );
         }}
@@ -680,7 +680,7 @@ export function SeminarsScreen({ navigation }) {
                   </Text>
                 </TouchableOpacity>
               </View>
-              <FeedActions feedPostId={item.feedPostId} navigation={navigation} />
+              <FeedActions feedPostId={item.feedPostId} fallback={{ kind: 'seminar', authorId: item.authorId, title: item.title }} navigation={navigation} />
             </View>
           );
         }}

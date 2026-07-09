@@ -168,7 +168,7 @@ export default function FindFriendsScreen({ navigation }) {
             ))}
           </View>
         )}
-        <FeedActions feedPostId={it.feedPostId} navigation={navigation} />
+        <FeedActions feedPostId={it.feedPostId} fallback={{ kind: 'findfriends', authorId: it.authorId, title: kindOf(it.kind).label }} navigation={navigation} />
       </View>
     );
   };

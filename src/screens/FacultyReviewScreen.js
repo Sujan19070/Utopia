@@ -148,7 +148,7 @@ export default function FacultyReviewScreen({ navigation }) {
           <Text style={[type.body, { marginTop: 4 }]}>{r.tips}</Text>
         </View>
       )}
-      <FeedActions feedPostId={r.feedPostId} navigation={navigation} />
+      <FeedActions feedPostId={r.feedPostId} fallback={{ kind: 'review', authorId: r.realAuthorId, title: r.faculty }} navigation={navigation} />
     </View>
   );
 

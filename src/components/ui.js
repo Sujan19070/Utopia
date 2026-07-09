@@ -179,9 +179,17 @@ export function ReportModal({ visible, onClose, onSubmit }) {
 // Compact react + comment bar for campus section cards, operating on the
 // post's linked FEED copy — so reactions, comments and mentions are the
 // same everywhere.
-export function FeedActions({ feedPostId, navigation }) {
+export function FeedActions({ feedPostId, fallback, navigation }) {
   const { posts, reactToPost, user } = useApp() || {};
-  const feedPost = (posts || []).find((p) => p.id === feedPostId);
+  let feedPost = feedPostId ? (posts || []).find((p) => p.id === feedPostId) : null;
+  // Older section posts predate the id linkage — find their feed copy by
+  // matching kind + author (+ title when available).
+  if (!feedPost && fallback) {
+    feedPost = (posts || []).find((p) =>
+      p.campusKind === fallback.kind &&
+      p.realAuthorId === fallback.authorId &&
+      (!fallback.title || p.campusTitle === fallback.title));
+  }
   if (!feedPost) return null;
 
   const myKey = feedPost.reactions?.[user.id] ||
@@ -493,7 +501,7 @@ const styles = ThemedSheet(() => ({
     paddingHorizontal: spacing.lg, marginTop: spacing.xl, marginBottom: spacing.md,
   },
   photo: {
-    marginTop: spacing.md, width: '100%', height: 320,
+    marginTop: spacing.md, width: '100%', aspectRatio: 4 / 3,
     borderRadius: radius.md, backgroundColor: colors.primarySoft,
   },
   breakdown: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },

@@ -51,7 +51,8 @@
       ],
       "expo-audio",
       "expo-sharing",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-font"
     ],
     "extra": {
       "eas": {

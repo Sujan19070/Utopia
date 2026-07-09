@@ -68,6 +68,7 @@ export function AppProvider({ children }) {
         unsubProfile = onSnapshot(doc(db, 'users', fb.uid), (snap) => {
           const p = snap.exists() ? snap.data() : {};
           setUser({
+            ...p, // every profile field, present and future (stars, bans, …)
             id: fb.uid,
             email: fb.email,
             emailVerified: fb.emailVerified,
@@ -689,17 +690,22 @@ export function AppProvider({ children }) {
   // ---- daily star rewards ----
   // Everyone generates 2 stars per day to give away on Education & Jobs
   // posts. Stars can't be taken back. Totals decide the Campus Spotlight.
-  const dateKey = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
+  const DAY_MS = 24 * 3600 * 1000;
   const weekKeyNow = () => {
     const d = new Date();
     d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back to Monday
     return `w-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
-  const starsLeftToday = () =>
-    (user?.starDate === dateKey() ? (user.starsLeft ?? 0) : 2);
+  const starsLeftToday = () => {
+    if (!user) return 0;
+    const start = user.starCycleStart || 0;
+    if (Date.now() - start >= DAY_MS) return 2; // cycle over -> fresh 2 stars
+    return user.starsLeft ?? 0;
+  };
+  const starsResetInHours = () => {
+    const start = user?.starCycleStart || 0;
+    return Math.max(1, Math.ceil((start + DAY_MS - Date.now()) / 3600000));
+  };
 
   // Account suspension: bannedUntil is 'forever' or a millisecond timestamp.
   const banActive = !!user && (
@@ -716,9 +722,20 @@ export function AppProvider({ children }) {
     if (toUserId === user.id) return { ok: false, msg: "You can't star your own post." };
     const left = starsLeftToday();
     if (left <= 0) {
-      return { ok: false, msg: 'No stars left today — you get 2 fresh stars every day.' };
+      return {
+        ok: false,
+        msg: `No stars left — your next 2 stars arrive in about ${starsResetInHours()}h.`,
+      };
     }
-    await updateDoc(doc(db, 'users', user.id), { starsLeft: left - 1, starDate: dateKey() });
+    // A fresh cycle starts the moment the FIRST star of the cycle is given.
+    const freshCycle = Date.now() - (user.starCycleStart || 0) >= DAY_MS;
+    const cycleStart = freshCycle ? Date.now() : user.starCycleStart;
+    await updateDoc(doc(db, 'users', user.id), {
+      starsLeft: left - 1, starCycleStart: cycleStart,
+    });
+    // Optimistic local update so rapid taps can't double-spend before the
+    // live snapshot round-trips.
+    setUser((prev) => (prev ? { ...prev, starsLeft: left - 1, starCycleStart: cycleStart } : prev));
     // A star can live on more than one doc (the section post + its feed copy).
     const tgts = targets || [{ coll, id }];
     for (const t of tgts) {
